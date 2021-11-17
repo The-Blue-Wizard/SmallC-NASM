@@ -1,0 +1,14 @@
+<html>
+<span style='font-family:"Courier New";mso-bidi-font-family:Arial'>
+Producing .EXE Files: <BR><BR>
+In addition to the macro example given in the source tree for NASM, I give a -fbin form here.  The EXE Header is crafted as the example code shows.  This fits the method used, as the code manages its own segments.  The EXE Header is made to be 100h bytes in size so that when the loader strips it off and prepends a Program Segment Prefix, the code and data alignments following it are unaffected.  The end of the Header is the initial temporary stack, defined by entries in the Header Record itself.  Winxx, XP's CMD.EXE won't load an -fbin .COM if > 64k, yet the same code with this .EXE Header, will load and can run.<BR><BR>
+<A HREF="EXETMPLT.NSM.HTML"><b><i>EXETMPLT.NSM </i></b></A>
+<BR><BR>
+<i>2:38 PM 7/4/2009</i>
+
+
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

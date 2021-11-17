@@ -1,0 +1,193 @@
+<PRE><CODE>
+3:51 PM 10/17/2008
+
+An error in the nasm code generation is found with this example:
+------------------
+/** err_tst.c **/
+
+char cptr[];
+int  *mydata;
+
+errtest()
+{
+	return 0;
+}
+
+------------------
+
+;Small-c Compiler rev 1.1 re:NASM c0.1.5 Aug 2008
+	[MAP ALL SCCN.MAP]
+	SECTION .text vstart=0100h
+
+;/** err_tst.c **/ 
+; 
+;char cptr[]; 
+;int  *mydata; 
+; 
+;errtest() 
+errtest:
+;{ 
+;	return 0; 
+	MOV  AX,0
+	RET
+;} 
+;                                              
+	;-; SECTION .dseg align=16 ;; commented out for .com version
+cptr:	TIMES 0	DW 	0
+mydata:	TIMES 1	DW 	0
+
+;0 errors in compilation.
+;	-= END =-
+
+-==*** Generating a Listing File shows how 'TIMES 0	DW 	0' is handled. ***==-
+
+     1                                  ;Small-c Compiler rev 1.1 re:NASM c0.1.5 Aug 2008
+     2                                  	[MAP ALL SCCN.MAP]
+     3                                  	SECTION .text vstart=0100h
+     4                                  
+     5                                  ;/** err_tst.c **/ 
+     6                                  ; 
+     7                                  ;char cptr[]; 
+     8                                  ;int  *mydata; 
+     9                                  ; 
+    10                                  ;errtest() 
+    11                                  errtest:
+    12                                  ;{ 
+    13                                  ;	return 0; 
+    14 00000000 B80000                  	MOV  AX,0
+    15 00000003 C3                      	RET
+    16                                  ;} 
+    17                                  ;                                              
+    18                                  	;-; SECTION .dseg align=16 ;; commented out for .com version
+    19                                  cptr:	TIMES 0	DW 	0
+    20 00000004 0000                    mydata:	TIMES 1	DW 	0
+    21                                  
+    22                                  ;0 errors in compilation.
+    23                                  ;	-= END =-
+
+-========-
+A reference to cptr[] in line 19 actually is a reference to mydata in line 20, Trouble!
+The following corrected code generation shows the difference...
+-========-
+;Small-c Compiler rev 1.1 re:NASM c0.1.5 Aug 2008
+	[MAP ALL SCCN.MAP]
+	SECTION .text vstart=0100h
+
+;/** err_tst.c **/ 
+; 
+;char cptr[]; 
+;int  *mydata; 
+; 
+;errtest() 
+errtest:
+;{ 
+;	return 0; 
+	MOV  AX,0
+	RET
+;} 
+;                                              
+	;-; SECTION .dseg align=16 ;; commented out for .com version
+cptr:	TIMES 1	DW 	0
+mydata:	TIMES 1	DW 	0
+
+;0 errors in compilation.
+;	-= END =-
+
+-== Generating a Listing File shows... ==-
+
+     1                                  ;Small-c Compiler rev 1.1 re:NASM c0.1.5 Aug 2008
+     2                                  	[MAP ALL SCCN.MAP]
+     3                                  	SECTION .text vstart=0100h
+     4                                  
+     5                                  ;/** err_tst.c **/ 
+     6                                  ; 
+     7                                  ;char cptr[]; 
+     8                                  ;int  *mydata; 
+     9                                  ; 
+    10                                  ;errtest() 
+    11                                  errtest:
+    12                                  ;{ 
+    13                                  ;	return 0; 
+    14 00000000 B80000                  	MOV  AX,0
+    15 00000003 C3                      	RET
+    16                                  ;} 
+    17                                  ;                                              
+    18                                  	;-; SECTION .dseg align=16 ;; commented out for .com version
+    19 00000004 0000                    cptr:	TIMES 1	DW 	0
+    20 00000006 0000                    mydata:	TIMES 1	DW 	0
+    21                                  
+    22                                  ;0 errors in compilation.
+    23                                  ;	-= END =-
+
+-=============-
+
+Now cptr is a proper data item (address holder of cptr[], just as ptr mydata has been).
+
+Here is the Fix...
+-=============-
+
+ErrFix.txt
+3:37 PM 9/28/2008
+
+Change dump globals so that TIMES 0 db 0 is not generated for nasm.
+Nasm will create a label only but no space for it, so that,
+the next data item is clobbered in an assignment.  For example:
+
+char cptr[];   - generates - cptr: TIMES 0 dw 0 ;; which is a label only.
+int  *mydata;  - this follows cptr, a label, so an assignment to cptr gets stuffed
+                 into mydata; they have the same address in the data segment.
+
+/*					*/
+/*	Dump all static variables	*/
+/*					*/
+/** these are put to outfile, required **/
+/** for nasm DSegment data ref. defs.  **/
+/** Form; {Name,TIMES,numb,DB 0}       **/
+
+dumpglbs()
+	{
+	int j;
+	if(glbflag==0)return;	/* don't if user said no */
+/** do SECTION here as well, there may not be lits, above **/
+	do_dseg();     /** in SCCN8.C for section .dseg **/
+	nl();	/** do in dumplits, it is first **/
+	cptr=startglb;
+	while(cptr < glbptr)
+		{if(cptr[ident]!=function)
+			/* do if anything but function */
+			{outstr(cptr);col();
+				/* output name as label... */
+			defstorage();	/* define storage, Times */
+			j=((cptr[offset]&255)+((cptr[offset+1]&255)<<8));
+				/* calc # bytes lo,hi */
+/**	why?		if((cptr[type]==cint)|(cptr[ident]==pointer)) **/
+/**	why?			j=j+1;					**/
+
+This statement to be changed...
+			outdec(j);	/* need that many */
+change to..
+			if (j) outdec(j);
+			else outdec(1);
+end chg..
+
+			if((cptr[type]==cint)|(cptr[ident]==pointer))
+				defword();
+				else defbyte();
+			ot("0"); /** filler value **/
+			nl();
+			}
+		cptr=cptr+symsiz;  /** inc thru table **/
+		}
+	}
+
+-=============-
+This error does suggest a way to handle union and structure tag references however!
+-=============-
+-= eof =-
+-=============-
+</CODE></PRE>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

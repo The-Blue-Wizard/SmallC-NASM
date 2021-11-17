@@ -1,0 +1,40 @@
+<html>
+<span style='font-family:"Courier New";mso-bidi-font-family:Arial'>
+<h3>
+-== About Small C ==-
+</h3>
+<h4>
+<p>
+	Written circa 1980 by Ron Cain to port a subset of K&R C to the 8080 cpu.  This is a 'bootstrap' of the C language compiler.  The goal was to develop a compiler for a proper subset of the language that could be ported over to a system which had only a native assembler tool.  With a handful of assembler support routines for IO and logical operations, a self compiling compiler (meaning itself written in its language, in this case, K&R C) could be ported to a new enviornment, and small-c is an example of this.  Once small-c had been ported to the new enviornment, scale-up extentions could be done.  A new improvement is incorporated into compiler source, then compiled with the current version of one's small-c, and if all goes well, a new improved version of the compiler is generated.  Thus, incrementally, small-c approaches a full featured C language Compiler on the target enviornment.
+</p>
+<p>
+	Normally, this sort of development is handled by cross development on a different system through target emulation.  In 1980, those resources weren't available to many system hobbyists, and Cain's innovation spurred the wildfire popularity of the C language, which had been in existance for 10 years already by 1980.
+</p>
+<p>
+	Many versions of Small C are in the wild, but few have kept their development lineage history so that they tend to have scaled up to an enviornment specific version.  Thus keeping Cain's C original version for software historical reasons is worthwhile.  The Language Standard is K&R C.  The language syntax parser is of recursive descent design.
+</p>
+</h4>
+<h3>
+-== Scaling Issues ==- 
+</h3>
+<h4>
+<p>
+	Small C implements int and char, no float, no double, no structure (handled as arrays of contiguous objects instead), no union, no long, no short, no unsigned (int's & char's are signed per K&R), no auto (as keyword; autos are implemented as stack objects), no external (as keyword; provisionally asm globals), no register, no typedef, no static (as keyword; static's are data grouped at the end of code), no goto, return yes, no sizeof, break yes, continue yes, if yes, else yes, no for(;;), no do, while yes, no switch (substituted as list of 'if's'), no case, no default, no entry, .. #include yes, #define yes, #asm..#endasm yes (a near imperative extention).  No prototypes, not ansi-c syntaxed, K&R syntax yes.
+</p>
+<p>
+	main (argc, argv) ; This syntax is accepted by small-c but its implementation is so system dependant that Cain wisely chose to ask the operator for parameter inputs thru 'console input' rather than command line parameters to sidestep this implementation detail until a later time. 
+</p>
+</h4>
+<h4>
+<p>
+-== Last: 8:21 AM 8/7/2008 Init: 8:21 AM 8/7/2008 ==-
+</p>
+<p>
+-=== EOF ===-
+</p>
+</h4>
+</html>
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

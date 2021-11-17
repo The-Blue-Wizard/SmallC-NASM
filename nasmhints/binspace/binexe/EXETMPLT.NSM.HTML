@@ -1,0 +1,294 @@
+<PRE><CODE>
+ [MAP ALL EXETMPLT.MAP]
+;;--------------------------------------------------------60
+;; File: EXETMPLT.NSM  By: s_dubrovich@yahoo.com
+;; Last: 04-Jul-09 01:19:10 PM
+;; Init: 08-Jun-09 11:11:36 PM
+;; Vers: 0.0.0 r8
+;; Note: make as .exe
+;;--------------------------------------------------------60
+;;--------------------------------------------------------60
+;; SubrLst:      //subroutine entries for global use
+;; Endsubrlst:
+;;
+;; ExternLst:    //required here, defined elsewhere
+;; EndExternLst:
+;;
+;; GlobalLst:    //global storage defined in here
+;; EndGlobLst:
+;;
+;; Notes: A Module has the form of Sections to be 
+;;  included into a skeletal .NSM file.
+;;--------------------------------------------------------60
+;;--------------------------------------------------------60
+;; NASM creates the section.<secname>.start for each 
+;; section, which may be used in your code.
+;;
+;; Nasm conditionals test for Z,NZ where (%IF Expr)
+;;  succeeds if Val of Expr is non-zero.
+
+TRUE    equ 1
+FALSE   equ TRUE-TRUE  
+Testing equ FALSE
+
+FSGS  equ TRUE  ;; use FSeg and GSeg Segments.
+pcDos equ TRUE  ;; don't forget to rename .bin
+
+;;========================================================60
+;; -== Sections Strategy for EXE ==-
+;;========================================================60
+;;--------------------------------------------------------60
+;; This Section is placed first by NASM, use for EXE header
+;;--------------------------------------------------------60
+  [SECTION .text vstart=0 align=16]
+hdr_:
+  db 'MZ'			; EXE file signature
+  dw Len_Real % 512	; Number of bytes in last block
+  dw (Len_Real + 511) / 512 ; size of file with header
+  dw 0			; relocation information: none
+  dw Len_hd / 16		; header size in paragraphs
+  dw Len_Virt / 16	; min extra mem
+  dw 0FFFFh			; max extra mem, (Len_Virt) / 16
+  dw 0h			; Initial SS (before fixup)[*]
+  dw 00F0h			; Initial SP (before fixup)[*]
+  dw 0			; (no) Checksum
+  dw 100h			; Initial IP - start just after the header
+  dw -10h			; Initial CS (before fixup)[*]
+  dw 0			; file offset to relocation table: none
+  dw 0			; (no overlay)
+	  align 256,db 0  ;; [*] seems to work fine,
+hdr_end:			;;  Top of initial Stack.
+  Len_hd EQU (hdr_end-hdr_)
+;;--------------------------------------------------------60
+;; NOTE: CS:0100h, so actual psp is -10h paragraphs to CS
+;;  segm value, -(0100h) offset.  The negative offsets
+;;  pertain relative to DS&ES for the loader to calculate
+;;  memory placement.
+;;	CS	SS	DS	ES	FS	GS	iCS	iSS
+;;	4655	4675	4665	4665	0000	0000	-20h	0000	tst2
+;;	4675	4655	4665	4665	0000	0000	0	-20h	tst3
+;;	4665	4665	4665	4665	0000	0000	-10h	-10h	tst4
+;; >	4665	4655	4665	4665	0000	0000	-10h	-20h	tst5 
+;;--------------------------------------------------------60
+;;========================================================60
+;; M O D U L E   I N I T I A L I Z A T I O N
+;;========================================================60
+;;-== setup runtime segment registers from current CS ==-
+;; Note: this assumes real mode contiguous binary.
+;; EAX Runtime CS.
+;; ECX Offset -> Segm work register.
+;; EDX Prior Segment value (+ its length = next Segment).
+
+%IF pcDos ;; vstart=0100h ;; for .COM section adjustments
+  [SECTION .cseg start=0100h align=16]
+%ELSE
+  [SECTION .cseg vstart=0 align=16]
+%ENDIF
+
+mod_init:  ;; -= This method requires separate CS,DS,SS segments =-
+
+  mov  eax, CS
+  mov  edx, eax                   ;; prime segm calc
+  mov  ecx, (section..cseg.start) ;; start=0100h
+
+  shr  ecx, 4                  ;; conv CS offs to its paragraph
+  add  edx, ecx                ;; set true DS as load segm + offs
+
+do_ds:                         ;; the offset of DS is len CS
+  mov  ecx, Len_cs             
+  shr  ecx, 4                  ;; conv CS len to its paragraph
+  add  edx, ecx                ;; set true DS as load segm + offs pgh.
+
+  mov  DS, dx                  ;; set DS, now we can save data.
+  mov  [sav_ds_base], dx       ;; dx`DS, ax`CS
+  mov  [sav_cs_base], ax
+
+do_es:
+  mov  ecx, Len_ds
+  shr  ecx, 4                  ;; make ES offset paragraph
+  add  edx, ecx                ;; DX has DS, +ppg = ES
+
+  mov  ES, dx
+  mov  [sav_es_base], dx
+
+;;== CS,DS,ES Set. ==
+;;== Set FS,GS ==
+
+do_fs:
+%IF FSGS                       ;; use FS,GS ?nested IFs?-Allowed.
+  mov  ecx, Len_es
+  shr  ecx, 4                  ;; make FS offset paragraph
+  add  edx, ecx                ;; DX has ES, +ppg = FS
+
+  mov  FS, dx
+  mov  [sav_fs_base], dx
+
+do_gs:
+  mov  ecx, Len_fs
+  shr  ecx, 4                  ;; make GS offset ppg
+  add  edx, ecx                ;; DX has FS, +ppg = GS
+
+nofixGS:
+  mov  GS, dx
+  mov  [sav_gs_base], dx
+%ENDIF
+
+do_ss:
+  mov  ecx, Len_gs 
+  shr  ecx, 4                  ;; segment offset of .SSEG
+  add  edx, ecx
+
+  mov  SS, dx                  ;; Put Stack after Data.
+  mov  [sav_ss_base], dx
+
+prep_sp:
+  mov  sp, stacktop ;; offset in SSEG
+  mov  bp, sp       ;; start with a known value...
+  sub  bp, 2
+  push bp           ;; now bp==[sp]==sp and this
+          ;; represents a known start state where
+          ;;  this is the root of a possible chain
+          ;;  of stack frames with bp as a link to
+          ;;  a previous stack frame, or itself [head].
+
+;;--------------------------------------------------------60
+;; virtual sections based from ADUMMY section, overlap .start
+do_x1:
+  mov  ecx, Len_ss
+  shr  ecx, 4                   ;; segment offset of .X1SEG
+  add  edx, ecx
+
+  mov  [sav_x1_base], dx
+
+do_x2:
+  mov  ecx, Len_x1 ;;(section..x2seg.start - Len_hd )
+  shr  ecx,4                    ;; segment offset of .X2SEG
+  add  edx,ecx
+  mov  [sav_x2_base], dx
+
+;;=========================================================60
+;; I N I T
+;;=========================================================60
+
+;; call _Main_  ;; main initializiation or main entry.
+  nop
+  nop
+  nop
+alldone:
+  mov  ah,0
+  int  16h
+  int  19h
+;;=========================================================60
+;; Needed here to set Section Order and Placement.
+
+  [SECTION .dseg vstart=0 align=16]
+sav_cs_base: dw 1111h  ;; seed these for the debugger
+sav_ds_base: dw 2222h
+sav_es_base: dw 3333h
+sav_fs_base: dw 4444h
+sav_gs_base: dw 5555h
+sav_ss_base: dw 6666h
+sav_x1_base: dw 7777h  ;; possibly a Data Transfer Buffer.
+sav_x2_base: dw 8888h  ;; possibly a Heap.
+;;
+Real_Size:   dw Len_Real
+Virt_Size:   dw Len_Virt
+Mod_Size:    dd Len_Real + Len_Virt ;; may be > 64k
+;;
+initcount:   dw 0
+FTGTO: DW 0 ;; dest. far offset
+FTGTS: DW 0 ;; dest. far segm
+
+;;===================================================55
+;; Needed here to set Section Order and Placement.
+  [SECTION .eseg vstart=0 align=16]
+;;  TIMES ( 16 * 1024 ) dw 0  ;; 32k area
+;;===================================================55
+;; Needed here to set Section Order and Placement.
+  [SECTION .fseg vstart=0 align=1]  ;; align=16
+  TIMES (( 64 * 1024  )) db 0  ;; 64k area
+;;===================================================55
+;; Needed here to set Section Order and Placement.
+  [SECTION .gseg vstart=0 align=16]
+;; TIMES ( 16 * 1024 ) dw 0  ;; 32k area
+;;===================================================55
+;; I N I T   I N C L U D E D   M O D U L E S   A R E A
+;;===================================================55
+;-; %INCLUDE "MAIN_MOD.MOD"  ;; main block of prgm flow.
+;-; %INCLUDE "MOD_INCL.MOD"  ;; main body of functions.
+
+;;===================================================55
+;; -== S T A C K ==-
+;;===================================================55
+;; Needed here to set Section Order and Placement.
+
+  [SECTION .sseg vstart=0 align=16]
+stackbase:
+  TIMES 200h db 0CCh ;; size depends on application.
+stacktop:
+  Len_ss EQU $-$$
+
+;;--------------------------------------------------------60
+;; S E C T I O N S   W R A P - U P
+;;--------------------------------------------------------60
+;;===================================================55
+;;    A D U M M Y   S E C T I O N
+;;===================================================55
+;; This is an anchor for nobits sections to allow
+;; vstart equivalent to zero.  Otherwise the start of
+;; the nobits is at the end of a physical section, some
+;; positive offset.  By making .dummy of zero length
+;; and the last declared physical section, then nasm
+;; figures the vstart of the first nobits section as
+;; zero.  Check the .MAP file to make sure.
+
+  [SECTION .adummy vstart=0 align=16]
+    align 16, db 90h
+
+;;===================================================55
+;;    S E C T I O N   C L E A N U P
+;;===================================================55
+  [SECTION .cseg]
+    align 16, db 90h
+Len_cs EQU $-$$
+  [SECTION .dseg]
+    align 16, db 20h
+Len_ds EQU $-$$
+  [SECTION .eseg]
+    align 16, db 20h
+Len_es EQU $-$$
+  [SECTION .fseg]
+;;    align 16, db 20h
+Len_fs EQU $-$$
+  [SECTION .gseg]
+    align 16, db 20h
+Len_gs EQU $-$$
+Len_Real EQU (Len_cs+Len_ds+Len_es+Len_fs+Len_gs+Len_ss)
+
+;;===================================================55
+;;    N O B I T S   S E C T I O N S
+;;===================================================55
+  [SECTION .x1seg align=16 nobits follows=.adummy]
+;;vstart=0 ;;vOffset:  resw 1 ;;vSegment: resw 1
+  resb 16
+;;DTA: resw (16 * 1024)  ;; 32k buffer
+
+    align 16, resb 1
+Len_x1 EQU $-$$
+
+  [SECTION .x2seg align=16 nobits follows=.x1seg]
+;;vstart=0 ;;vOffset2:  resw 1 ;;vSegment2: resw 1
+  resb 32
+    align 16, resb 1
+Len_x2   EQU $-$$
+Len_Virt EQU Len_x1 + Len_x2
+
+;;===================================================55
+;; -==** EOF **==-
+;;===================================================55
+</CODE></PRE>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

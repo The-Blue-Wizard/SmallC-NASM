@@ -1,0 +1,320 @@
+<html>
+<code>
+<pre>
+;;PAGEWIDTH 80
+;;TITLE 'NATIVE BOOT'
+[MAP ALL NAT_BOOT.MAP]
+;;---------------------------------------------------55
+;; Program Name: nat_boot.nsm By: s_dubrovich@yahoo.com
+;; Last Update: 15 SEP 2007  Init: 10 NOV 2005
+;; Version: 0.3.0 Goal: bootstrap fat16 native.run file
+;; Desc: floppy boot sector.
+;; Comments:
+;; Single Stage Boot of file NATIVE.RUN Using Fat12
+;;  file struct, load target to 4Kpg1, at 0100:0000h,
+;;  then jmpf to its beginning.
+;; This ver adds PnP Installation Check Info save.
+;; EndComments:
+;;---------------------------------------------------55
+;; nasm
+;; -f bin -l natboot.lst -o natboot.bin nat_boot.nsm
+;;---------------------------------------------------55
+;; Base Program Code Entry Here
+;;---------------------------------------------------55
+
+number_tracks  equ 80 ;; 3 1/2 1.44 mb
+number_sectors equ 18 ;; 18spt
+
+lf equ  0Ah       ;ASCII LINE FEED
+cr equ  0Dh       ;ASCII CARRIAGE RETURN
+
+     [BITS 16]
+
+;;Rombios loads this to 0000:7C00, DL==boot drv.
+;;---- initial cseg declaration ----
+  SECTION .cseg vstart=0 
+ 
+BS_jmpBoot:     jmp     START
+;;---------------------------------------------------55
+;; win95 overwrites OEM_ID, don't depend on it.
+
+  BS_OEMName            db "boot_nat" ;; OEM_ID
+  BPB_BytesPerSec       dw 0200h
+  BPB_SecPerClus        db 01h 
+  BPB_RsvdSecCnt        dw 0001h
+  BPB_NumFATs           db 02h
+  BPB_RootEntCnt        dw 00E0h
+  BPB_TotSec16          dw 0B40h ;;720k=05A0h
+  BPB_Media             db 0F0h
+  BPB_FatSz16           dw 0009h
+  BPB_SecPerTrk         dw 0012h
+  BPB_NumHeads          dw 0002h
+  BPB_HiddSec           dd 00000000h ;preceding vol
+  BPB_TotSec32          dd 00000000h ;small vol
+  BS_DrvNum             db 00h
+  BS_Reserved1          db 00h
+  BS_BootSig            db 29h ;;indicates the next
+;; three fields are valid, newer fat spec
+  BS_VolID              dd 0FFFFFFFFh
+  BS_VolLab             db "GONATIVERUN"
+  BS_FilSysType         db "FAT12   "
+  BS_Img_Vers           db "Native Vers 0.3.0"
+
+;;---------------------------------------------------55
+;; code located at 0000:7C00. Load NATIVE.RUN to
+;; 0100:0000h and jmpf next.  Save PnP vals above the
+;; Bios Data Area.
+
+START: ;; .IF. PnP, these reg. values are valid:
+  mov  [0514],ES ;First save PnP Installation Check
+  mov  [0512],di ; FarPtr to Struc. [assuming valid]
+  mov  [0510],dx ;Physical Device Number - Boot Device.
+
+;****************************************************55 
+; code located at 0000:7C00, adjust segment registers
+
+;;START:
+  cli
+  mov  ax,0x07C0
+  mov  ds,ax
+  mov  es,ax
+;  mov  fs,ax
+;  mov  gs,ax
+; create stack
+  mov  ax,0x0000
+  mov  ss,ax
+  mov  sp,7C00h
+  sti
+; post message
+  mov  si, msgLoading
+  call DisplayMessage
+
+;****************************************************55
+LOAD_ROOT:
+
+; compute size of root directory _in sectors_ 
+;  and store in ?cx?
+  xor  cx,cx
+  xor  dx,dx
+  mov  ax,0x0020           ; 32 byte directory entry
+  mul  WORD [BPB_RootEntCnt] ;total size of directory
+  div  WORD [BPB_BytesPerSec] ;sectors used by dir
+  xchg ax,cx       ; cx == dir size in sectors.
+
+; compute location of root directory and store in ?ax?
+  mov  al,BYTE [BPB_NumFATs]  ; number of FATs
+  mul  WORD [BPB_FatSz16] ; sectors used by FATs
+  add  ax,WORD [BPB_RsvdSecCnt] ; adj for bootsector
+  mov  WORD [datasector],ax ; base of root directory
+  add  WORD [datasector],cx ; plus dirsz =1st data sect
+; read root directory into memory (7C00:0200)
+  mov  bx,0x0200      ; copy root dir above bootcode
+  call ReadSectors
+; browse root directory for binary image
+  mov  cx,WORD [BPB_RootEntCnt] ; load loop counter
+  mov  di,0x0200           ; locate first root entry
+
+.LOOP:
+  push cx
+  mov  cx,0x000B           ; eleven character name
+  mov  si,ImageName        ; image name to find
+  push di
+  rep  cmpsb               ; test for entry match
+  pop  di
+  je   LOAD_FAT
+  pop  cx
+  add  di,0x0020   ; queue next directory entry
+  loop .LOOP
+  jmp  FAILURE
+
+;****************************************************55
+LOAD_FAT:
+; save starting cluster of boot image
+  mov  si,msgCRLF
+  call DisplayMessage
+  mov  dx, WORD [di + 0x001A]
+  mov  WORD [cluster], dx   ; file?s first cluster
+; compute size of FAT and store in ?cx?
+  xor  ax,ax
+  mov  al,BYTE [BPB_NumFATs]  ; number of FATs
+  mul  WORD [BPB_FatSz16] ; sectors used by FATs
+  mov  cx,ax
+; compute location of FAT and store in ?ax?
+  mov  ax,WORD [BPB_RsvdSecCnt] ; adj for bootsect
+; read FAT into memory (7C00:0200)
+  mov  bx,0x0200     ; copy FAT above bootcode
+  call ReadSectors
+
+;; Change Load point to 0100:0000h 
+;;  well above Bios Data Area.
+
+  mov  si,msgCRLF
+  call DisplayMessage
+  mov  ax,0100h         ; warning, load to segm,
+               ; assure Far Jmp matches this.
+  mov  es,ax            ; destination for image
+  mov  bx,0x0000        ; destination for image
+  push bx
+LOAD_IMAGE:
+  mov  ax,WORD [cluster] ; cluster to read
+  pop  bx               ; buffer to read into
+  call ClusterLBA       ; convert cluster to LBA
+  xor  cx,cx
+  mov  cl,BYTE [BPB_SecPerClus] ; sectors to read
+  call ReadSectors
+  push bx
+; compute next cluster
+  mov  ax,WORD [cluster] ; identify current cluster
+  mov  cx,ax            ; copy current cluster
+  mov  dx,ax            ; copy current cluster
+  shr  dx,0x0001        ;  divide by two
+  add  cx,dx            ; sum for (3/2)
+  mov  bx,0x0200        ; location of FAT in memory
+  add  bx,cx            ; index into FAT
+  mov  dx,WORD [bx]     ; read two bytes from FAT
+  test ax,0x0001
+  jnz  .ODD_CLUSTER
+.EVEN_CLUSTER:
+  and  dx, 0000111111111111b ; take low twelve bits
+  jmp  .DONE
+.ODD_CLUSTER:
+  shr  dx,0x0004           ; take high twelve bits
+.DONE:
+  mov  WORD [cluster], dx  ; store new cluster
+  cmp  dx,0x0FF0           ; test for end of file
+  jb   LOAD_IMAGE
+DONE:
+  mov  si,msgCRLF
+  call DisplayMessage
+  push WORD 0x0100     ; Alternate to Far JMP, Segm.
+  push WORD 0x0000     ; Offset
+  retf
+
+FAILURE:
+  mov  si,msgFailure
+  call DisplayMessage
+  mov  ah,0x00
+  int  0x16              ; await keypress
+  int  0x19              ; warm boot computer
+;****************************************************55
+;******************************************************
+; PROCEDURE DisplayMessage
+; display ASCIIZ string at ds:si via BIOS
+;******************************************************
+DisplayMessage:
+  lodsb                  ; load next character
+  or   al,al             ; test for NUL character
+  jz   .DONE
+  mov  ah,0x0E           ; BIOS teletype
+  mov  bh,0x00           ; display page 0
+  mov  bl,0x07           ; text attribute
+  int  0x10              ; invoke BIOS
+  jmp  DisplayMessage
+.DONE:
+  ret
+;****************************************************55
+;******************************************************
+; PROCEDURE ReadSectors
+; reads ?cx? sectors from disk starting at ?ax? into
+; memory location ?es:bx?
+;******************************************************
+ReadSectors:
+.MAIN
+  mov  di,0x0005        ; five retries for error
+.SECTORLOOP
+  push ax
+  push bx
+  push cx
+  call LBACHS
+  mov  ah,0x02          ; BIOS read sector
+  mov  al,0x01          ; read one sector
+  mov  ch,BYTE [absoluteTrack]   ; track
+  mov  cl,BYTE [absoluteSector]  ; sector
+  mov  dh,BYTE [absoluteHead]    ; head
+  mov  dl,BYTE [BS_DrvNum]     ; drive
+  int  0x13              ; invoke BIOS
+  jnc  .SUCCESS          ; test for read error
+  xor  ax, ax            ; BIOS reset disk
+  int  0x13              ; invoke BIOS
+  dec  di                ; decrement error counter
+  pop  cx
+  pop  bx
+  pop  ax
+  jnz  .SECTORLOOP       ; attempt to read again
+  int  0x18
+.SUCCESS
+  mov  si, msgProgress
+  call DisplayMessage
+  pop  cx
+  pop  bx
+  pop  ax
+  add  bx,WORD [BPB_BytesPerSec] ; queue next buffer
+  inc  ax                ; queue next sector
+  loop .MAIN             ; read next sector
+  ret
+;****************************************************55
+;******************************************************
+; PROCEDURE ClusterLBA
+; convert FAT cluster into LBA addressing scheme
+; LBA = (cluster - 2) * sectors per cluster
+;******************************************************
+ClusterLBA:
+  sub  ax,0x0002           ; zero base cluster number
+  xor  cx,cx
+  mov  cl,BYTE [BPB_SecPerClus] ; conv byte to word
+  mul  cx
+  add  ax,WORD [datasector]      ; base data sector
+  ret
+ 
+;******************************************************
+;****************************************************55
+; PROCEDURE LBACHS
+; convert AX == LBA addressing scheme 
+;  to CHS addressing scheme
+; absolute sector = 
+;(logical sector / sectors per track) + 1
+; absolute head   = 
+;(logical sector / sectors per track) MOD numb of heads
+; absolute track  = 
+;logical sector / (sectors per track * number of heads)
+;****************************************************55
+;******************************************************
+LBACHS:
+  xor  dx, dx            ; prepare dx:ax for operation
+  div  WORD [BPB_SecPerTrk]  ; calculate
+  inc  dl                ; adjust for sector 0
+  mov  BYTE [absoluteSector],dl
+  xor  dx, dx            ; prepare dx:ax for operation
+  div  WORD [BPB_NumHeads]   ; calculate
+  mov  BYTE [absoluteHead],dl
+  mov  BYTE [absoluteTrack],al
+  ret
+
+absoluteSector db 0x00
+absoluteHead   db 0x00
+absoluteTrack  db 0x00
+ 
+datasector  dw 0x0000
+cluster     dw 0x0000
+;; combine two fields to save space...
+msgLoading  db 0x0D, 0x0A, "Loading "
+ImageName   db "NATIVE  RUN"
+            db 0x0D,0x0A,0x00
+msgCRLF  db 0x0D, 0x0A, 0x00
+msgProgress db ".", 0x00
+msgFailure  db 0x0D, 0x0A,
+            db "ERROR : Press Any Key to Reboot",0x00
+ 
+  TIMES 510-($-$$) DB 0
+  DW 0xAA55
+;******************************************************
+;****************************************************55
+;-eof-
+</pre>
+</code>
+</html>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

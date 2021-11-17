@@ -1,0 +1,44 @@
+<HTML>
+
+<span style='font-family:"Courier New";mso-bidi-font-family:Arial'>
+<HR>
+<H3>NASM -fbin Examples</H3>
+<HR>
+<H4><p>NASM -fbin form of output creates a machine code binary file without any overhead of object file structures required for the various object file Loaders, such as ELF or COFF or PE or whatever.  Those object file formats require a respective Loader to load those into memory, under the guidance of a respective Operating System.  But here we explore -fbin and see to where it leads us.
+</H4>
+<HR>
+<H4>    <A HREF="binspace/binspace.htm"><i>BIN SPACE:</i></A> Examples and Notes on -fbin</H4>
+<HR>
+<pre>
+<H4><p>
+Q.  Hey, do you have an example of a floppy boot loader written in 
+    NASM? 
+A.  Yes, see:<A HREF="http://www.vnutz.com/content/program_a_bootstrap_loader">http://www.vnutz.com/content/program_a_bootstrap_loader</A>
+    Although I recommend a few changes to that code.  The Load point
+    of 0050:0000h is better changed to 0100:0000h, and the stack is
+    better placed at SS:0000h SP:7C00h, which is just below the
+    RomBios load point of where it reads the floppy boot sector to.
+    The location 0050:0000h actually holds a state flag for the
+    [Print Screen] key, for one thing.
+
+Q.  Help, do you have a simple Hello World example to help me get
+    started?
+A.  Yes, the lame <A HREF="hello/HELLO.NSM.html">'HELLO.NSM'</A>.  I use the filetype .NSM to stand for
+    Nasm .asm to distinguish from other asm syntaxes.
+
+Q.  Any tips on running NASM under Windows or XP?
+A.  Yes, here is a step by step on setting up a <A HREF="worksp/worksp.htm">'workspace enviornment'</A>
+    to run the dos version of NASM.EXE</p></H4>
+<HR>
+
+<p><i style='mso-bidi-font-style:normal'><span style='font-size:10.0pt;
+font-family:"Courier New";mso-bidi-font-family:Arial'><a
+href="../index.htm">BACK to main page</a><o:p></o:p></span></i></p>
+
+</pre>
+</html>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

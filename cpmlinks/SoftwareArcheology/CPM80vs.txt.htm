@@ -1,0 +1,92 @@
+<html>
+<code>
+<pre>
+;;
+;;  What CP/M does.
+;;
+;; From comp.os.com 28 MAR 2007
+;; Thread:: Wanted: 1802 CP/M (or, PL/M 1802)
+;;
+;; [snipped]
+>HAND, 
+>   Tarkin 
+
+
+Hi Tarken, 
+
+Thanks. 
+
+My arguement is that while we can do it, does it make sense?   To copy 
+CP/M archetecture to a CPU where page 0 is reserved or where program 
+sizes that fit the 8080/z80 model are too big for other CPU models is 
+a project for the exercise rather than developing on OS that exploits 
+a new CPUs capabilities.   Soon as you go from CP/M80 to some CP/M-xx 
+that is not 8080 the discussion revolves around file transfer not 
+running the basic 8080 code on something that would crash if it tried. 
+
+Could CP/M be written for a 1802, sure.     I know of someone that 
+took the 68000 version (written in C) and ported it to a VAX.    So 
+yes it could be done..   
+
+What does CP/M do:  It can: 
+
+TYPE a file, 
+ERAse it, 
+show a disk DIRectory, 
+REName a file, 
+SAVE a snapshot of ram starting at TPA start to disk file, 
+and execute a program that is 8080/z80 based starting at nominal TPA 
+start address (usually 100H for 8080/z80). 
+
+Anything beyond this is an application program that must load and run 
+at TPA start address (nominal cp/m versions 100H).  This includes: 
+
+DDT, ASM, LOAD, ED, STAT, PIP and about 20,000 programs written for 
+CP/M on 8080/z80.   
+
+The 8086 version is similar but it will not RUN a system floppy from 
+my kaypro 4/84.  the library is also far smaller for CP/M-86, and much 
+of it is source ported from CP/M-80 that takes advantage of the 8086 
+being very similar to 8080.  But a 8086 cannot run DDT from a CP/M 80 
+system disk (without an emulator or V20 cpu). 
+
+One thing I'd learned early on (pre-1979) is that CP/M has meaning 
+ONLY on 8080 and derivitive processors.   To  be explicit, it can be 
+ported to anything but, only 8080 and later derived CPUs can actually 
+run the library of CP/M program and third party application binaries 
+(ignoring emulators/SIMs).   So the only reason to "port" CP/M to any 
+other non-8080 family CPU is to have access to the filesystem to 
+transfer NON-EXECUTABLE sources, data files or text.  That is useful 
+and tools like RTCPM are out there for that  reason.   It's far easier 
+to do something that runs natively on a given CP/U and OS that allows 
+access to the CP/M file system for transfer.  This was widely done. 
+After all once you have application source code, the API (CP/M BDOS 
+calls and BIOS calls) and a filesystem emulation the rest of CP/M is 
+logically unimportant and the source code level.  This also has been 
+done many times as both widely known examples like various SIMs and 
+uniquely done one off projects. 
+
+There are few OSs that actually span a different CPU archetectures 
+and the examples that come to mind are: 
+
+CP/M 8080/z80/Z180/NSC800 family, 68000 and Z8000 also 8086(and later) 
+were developed by DRI offically.  I'd point out the 68k and Z8000 
+versions are almost unknown  but they exist. 
+
+VMS runs on both VAX (32bit) and Alpha(64bit). 
+
+Unix or unix flavored OSs run on VAX, Alpha, PDP-11, PDP-7, PCs, MIPS, 
+ARM, 68k, powerPC  and many others.  Unix or it's clones are by far 
+the most ported to anything. 
+
+I'm sure there are others but they are notable by there obscurity. 
+
+Allison 
+</pre>
+</code>
+</html>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

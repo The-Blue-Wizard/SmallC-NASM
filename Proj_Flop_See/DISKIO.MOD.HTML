@@ -1,0 +1,235 @@
+<PRE><CODE>
+;;PAGEWIDTH 80
+;;TITLE 'DISK IO MODULE'
+;;[MAP DISKIO.MAP]
+;;---------------------------------------------------55
+;; Module Name: diskio  .mod By: s_dubrovich@yahoo.com
+;; Last: 08-Feb-09 09:23:27 AM
+;; Prev Update: 26 JAN 2008  Init: 19 JAN 2008
+;; Vers: 0.0.5  Goal: floppy disk io
+;; Desc: 
+;;  INT13h diskette functions.
+;;  This is for reading diskettes,
+;;  To test interface functions.
+;; EndDesc:
+;;
+;; SubrLst:     //Code Labels meant for Global Use.
+;;  Read_Track:
+;;  Recal_Disk:
+;;  Write_Track:
+;; EndSubrLst:
+;;
+;; ExternLst:   //Code Labels refer to another module.
+;; EndExternLst:
+;;
+;; GlobalLst:   //Our Data Labels meant for Global Use.
+;;  Stat_Byte:
+;;  pStatMsg:
+;;  S_MsgLen:
+;; EndGlobalLst:
+;;
+;; ExternDataLst:  //Data Labels in Another Module.
+;; EndExternDataLst:
+;;
+;; Reqd NFN:     //List Function Libs. we Require
+;; EndReqd NFN:
+;;---------------------------------------------------55
+;;---------------------------------------------------55
+;; 08-Feb-09 09:23:27 AM
+;;---------------------------------------------------55
+;; Module Code Subroutines
+;;---------------------------------------------------55
+
+number_tracks  equ 80 ;; 3 1/2 1.44 mb
+SectPerTrk equ 18 ;; 18spt
+
+  [SECTION .cseg]
+;;---------------------------------------------------55
+;; S U B R O U T I N E S
+;;---------------------------------------------------55
+;; read track from disk into buffer, preset params
+;;  Dest. is ES:BX
+Read_Track:
+  push ES
+  mov  cx,3      ;; 3 tries
+Reread_Track:
+  push cx
+  call init_CHS
+  mov  ah,2      ;; read Fn
+  int  13h
+  pop  cx
+  jnc  Read_Exit ;; no error, return
+  call Recal_Disk
+  loop Reread_Track
+   ;; still failed to read, check Status
+  call Get_Status  ;; sets str ptr and status byte
+  stc
+Read_Exit:
+  pop  ES
+  RET
+;;---------------------------------------------------55
+;; recalibrate diskette controller on error
+Recal_Disk:
+  mov  ah,0
+  int  13h
+  RET
+;;---------------------------------------------------55
+;; write track onto diskette from buffer, preset params
+Write_Track:
+  call init_CHS
+  mov  ah,3
+  int  13h       ;; returns error in carry flag.
+  RET
+;;---------------------------------------------------55
+;; 
+init_CHS:
+  mov  bx,[myFS]
+  mov  ES,bx
+  mov  bx,[myDTA]
+  mov  ch,[track]
+  mov  cl,[sector]
+  mov  al,[count]   ;; # to transfer == SPT
+  mov  dh,[head]
+  mov  dl,[disk]
+  RET
+
+;;---------------------------------------------------55
+;; Tbl Bios #10, Disk Controller Status Bits..
+;; Int 13h Fn`01h Get Disk System Status..
+Get_Status:
+  mov  ah,01
+  mov  dl,[disk]
+  int  13h  ;; ret`AH status byte.
+  mov  [Stat_Byte],ah
+
+  cmp  ah,80h
+  jne  ck_40
+  mov  [pStatMsg],word Msg80
+  mov  [S_MsgLen],word Msg80Len
+ck_40:
+  cmp  ah,40h
+  jne  ck_20
+  mov  [pStatMsg],word Msg40
+  mov  [S_MsgLen],word Msg40Len
+ck_20:
+  cmp  ah,20h
+  jne  ck_10
+  mov  [pStatMsg],word Msg20
+  mov  [S_MsgLen],word Msg20Len
+ck_10:
+  cmp  ah,10h
+  jne  ck_0C
+  mov  [pStatMsg],word Msg10
+  mov  [S_MsgLen],word Msg10Len
+ck_0C:
+  cmp  ah,0Ch
+  jne  ck_09
+  mov  [pStatMsg],word Msg0C
+  mov  [S_MsgLen],word Msg0CLen
+ck_09:
+  cmp  ah,09h
+  jne  ck_08
+  mov  [pStatMsg],word Msg09
+  mov  [S_MsgLen],word Msg09Len
+ck_08:
+  cmp  ah,08h
+  jne  ck_06
+  mov  [pStatMsg],word Msg08
+  mov  [S_MsgLen],word Msg08Len
+ck_06:
+  cmp  ah,06h
+  jne  ck_04
+  mov  [pStatMsg],word Msg06
+  mov  [S_MsgLen],word Msg06Len
+ck_04:
+  cmp  ah,04h
+  jne  ck_03
+  mov  [pStatMsg],word Msg04
+  mov  [S_MsgLen],word Msg04Len
+ck_03:
+  cmp  ah,03h
+  jne  ck_02
+  mov  [pStatMsg],word Msg03
+  mov  [S_MsgLen],word Msg03Len
+ck_02:
+  cmp  ah,02h
+  jne  ck_01
+  mov  [pStatMsg],word Msg02
+  mov  [S_MsgLen],word Msg02Len
+ck_01:
+  cmp  ah,01h
+  jne  ck_nil
+  mov  [pStatMsg],word Msg01
+  mov  [S_MsgLen],word Msg01Len
+ck_nil:
+
+  RET
+
+;;---------------------------------------------------55
+;; Notes: AH.02 RD, AL.numb of sectors to xfer
+;;  ES:BX dest.buffer  CH.track CL.start sector
+;;  DH.head DL.unit drv numb
+;; Rets: NC.good, AH.0, AL.numb sectors xferred
+;;       CF.error,-> AH.err status byte
+;;----Local Function Data----
+  [SECTION .dseg]
+  align 16
+disk   db 0 ;; current disk (0..3) 0.A, 1.B
+head   db 0 ;; current side (0..1)
+track  db 0 ;; current track number (0..79)
+sector db 1 ;; starting sector number, never zero
+count  db SectPerTrk ;; #phys sectors per trk
+fl_flg db 0FFh ;; operation state flag.
+myGS   dw 0
+myFS   dw 0 ;; segment of DTA. must be init. by ModInit
+myES   dw 0 ;; segment of destination.
+myDS   dw 0
+myDTA  dw dskDTA,0 ;; offset of destination of DTA.
+  ;;
+Stat_Byte db 0 ;; set by Get_Status.
+S_MsgLen  dw UnknownLen ;; for WRT_STR.MOD
+pStatMsg  dw UnKnown ;; addr of err msg.
+UnKnown   db 'UnListed Disk Error',0
+ UnknownLen EQU ($-1)-UnKnown
+Msg80     db 'Disk Timed Out, fails to respond.',0
+ Msg80Len EQU ($-1)-Msg80
+Msg40     db 'Seek Failed.',0
+ Msg40Len EQU ($-1)-Msg40
+Msg20     db 'Controller Error.',0
+ Msg20Len EQU ($-1)-Msg20
+Msg10     db 'CRC error on read.',0
+ Msg10Len EQU ($-1)-Msg10
+Msg0C     db 'Invalid Media',0
+ Msg0CLen EQU ($-1)-Msg0C
+Msg09     db 'DMA Boundry Error.',0
+ Msg09Len EQU ($-1)-Msg09
+Msg08     db 'DMA Overrun Error.',0
+ Msg08Len EQU ($-1)-Msg08
+Msg06     db 'Diskette Change Line Active.',0
+ Msg06Len EQU ($-1)-Msg06
+Msg04     db 'Sector Not Found, Error.',0
+ Msg04Len EQU ($-1)-Msg04
+Msg03     db 'Write Protected Disk.',0
+ Msg03Len EQU ($-1)-Msg03
+Msg02     db 'Bad Address Mark, Bad Sector.',0
+ Msg02Len EQU ($-1)-Msg02
+Msg01     db 'Bad Command to Driver.',0
+ Msg01Len EQU ($-1)-Msg01
+  ;;
+;;date_mod: db ' 08-Feb-09 ',0
+;;----EO DSeg--------
+;;---------------------------------------------------55
+  [SECTION .fseg] ;; FS := File Section, vstart=0 ?
+  align 16, db 0FFh
+  ;; Track_sized_buffer...
+dskDTA TIMES (SectPerTrk*512) db 0E5h
+boundry db '***End Of DTA***'
+;;---------------------------------------------------55
+;;--EO DISKIO.MOD--
+;;---------------------------------------------------55
+</CODE></PRE>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

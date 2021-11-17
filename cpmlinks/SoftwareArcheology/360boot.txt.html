@@ -1,0 +1,189 @@
+<html>
+<code>
+<pre>
+;----------------------------------------------------55
+;-= CP/M Software Archeology =-
+;This is from a 360k disk image, placed on a 720k 3 1/2
+; floppy formatted as 360k.  "CP/M-86 for the IBM PC
+; and for the IBM PC/XT  Version 1.1" 1983, DRI.
+; 8'512 byte sectors per trk, 40trk.  Original format
+; 5 1/4 floppy size is 320k if double sided, 160k if
+; single sided.  Last byte of Sector 1, Track 0,
+; Head 0, (512 bytes physical sectors), is db 01h if 
+; double sided, 00h if single sided.  This CP/M-86
+; reads Hd0, Trk0..79, then Hd1, Trk79..0 physically,
+; by remapping the logical trk order by inverting the
+; track numbers of seeks on side1;
+; (i.e. 79-seektracknumber).
+;The Directory held space for 64 entries, it took up
+; 2k of Track1.  Track 0 was reserved for this boot
+; code.  The remaining space for data was 38 tracks x
+; 4k per track, plus half of track 1 (2k) = 154k total
+; space if the diskette was single sided. 354k of data
+; space if the diskette was double sided.
+;The BDOS file version of CP/M-86 is CP/M v2.2, and
+; the 5 1/4 single sided media could be read and 
+; written by both CP/M-80 (8080cpu) and CP/M-86 (8086)
+; OS's.
+;At 0000:7C00 is this Boot Strap after booting CP/M-86,
+; from the original 5 1/4 diskettes.
+; -disassembled with SID86.CMD
+; -rewritten in NASM syntax.
+; s_dubrovich@yahoo.com
+;----------------------------------------------------55
+; -f bin -O3 -l 360boot.lst -o 360boot.bin 360boot.txt
+;----------------------------------------------------55
+[BITS 16]
+  cli
+  mov  ax,cs
+  mov  ds,ax
+  mov  ss,ax
+  mov  sp,7C00h
+  sti
+  mov  si,7CE9h  ;; signon
+  call L7C89
+  mov  ah,0      ;; reset disk system
+  int  13h
+  jb   L7C89
+  mov  ax,0051
+  mov  es,ax    ;; ES := 0051h
+  sub  dx,dx    ;; DH.head := 0 DL.drv0 := A:
+  mov  bx,dx    ;; BX := 0 destination == 0051:0000h
+  mov  ch,1     ;; track 1 , trk 0 reserved for
+                ;;  bootstrap.
+  call L7C6B    ;; First 4k  
+                ;; (4k) Directory w/ CPM.SYS 1st.
+;; 00 43 50 4D 20 20 20 20 20 53 59 53 01 00 00 10
+;; single byte block numbers 01..09
+;;  64 dir entries x 20h = 0..7FFh 
+;;== 2k == 4 physical sectors.
+;; File resides first in data area at:
+;;  trk1, hd0, offset 0800h = sect 5.
+;;
+;----------------------------------------------------55
+  and  byte [ES:0000h],byte 0F0h  ;; mask out user num
+  and  word [ES:0009h],word 7F7Fh ;; clear attribute
+                                  ;;  high bits.
+  mov  di,0      
+  mov  si,L7CFA ;; fcb: db 0,'CPM     .SYS',0Dh
+  mov  cx,000Ch ;; ck 12 chars
+  rep cmpsb     ;; Test if 1st file is CPM.SYS by 
+                ;;  comparing ES:DI to
+  jnz  L7C8E    ;;  DS:SI.  0051:0 to 0000:7CFAh
+
+  push ds       ;; [ds=0]
+  mov  ax,es    ;; ES := 0051h
+  mov  ds,ax    ;; DS := 0051h
+  mov  si,0880h ;; data area begins after dir, is
+                ;;  cpm.sys, skip past header record
+                ;;  to start of code.
+  mov  di,0
+  mov  cx,0780h ;; count of remainder. 
+              ;; (less 80h header).
+  add  bx,cx  ;; Also, prep Ptr to next load location,
+              ;;  51:0780h.
+  rep movsb   ;; DS:SI -> ES:DI, move 1st code block to 
+              ;;  final load location. auto inc SI,DI.
+  pop  ds
+  mov  ch,2
+  call L7C6B  ;; read 4k to ES:BX  (8k)  0780h..177Fh
+  call L7C67  ;; read another 4k   (12k) 1780h..277Fh
+  call L7C67  ;; another 4k        (16k) 2780h..377Fh
+  call L7C67  ;; another 4k        (20k) 3780h..477Fh
+  call L7CA5  ;; Ballard's easter egg, if special key
+              ;;  pressed.
+  jmp far [L7CE4] ; Enter CPM thru Bios Init: routine.
+L7C67:
+  add  bx,1000h ;; increment by 4k,
+                ;;  8 sectors of 512 bytes.
+L7C6B:
+  mov  al,8  ;; number to read at once
+  mov  cl,1  ;; start sector
+  push ax
+  push bx
+  mov  ax,0E2Eh  ;; Write char in TTY mode, char '.'
+  sub  bx,bx
+  int  10h
+  pop  bx
+  pop  ax
+L7C7A:
+  mov  ah,2  ;; Read Disk Sectors to ES:BX
+  int  13h
+  jb   L7C83
+  inc  ch
+  RET
+L7C83:
+  dec  byte [7CE8h]
+  jnz  L7C7A
+L7C89:
+  mov  si,7D06h
+  jmp L7C91      ;;near
+L7C8E:
+  mov  si,7D35h  ;; err msg no cpm.sys
+L7C91:
+  call L7C97
+L7C94:           ;; Halt Loop
+  sti
+  jmp L7C94      ;;near
+L7C97:
+  cld
+  lodsb
+L7C99:
+  mov  ah,0Eh    ;; prt until null
+  sub  bx,bx
+  int  10h
+  lodsb
+  test al,al
+  jnz  L7C99
+L7CA4:
+  RET
+
+;----------------------------------------------------55
+L7CA5:   ;; Ballard's easter egg subroutine.
+  mov  ah,2 ;; Ret Keyboard Flags
+  int  16h
+  or   al,0F0h ;; test keypress combo for Ballard's 
+               ;;   easter egg. requires:
+;; scroll, number, caps locks enabled plus insert key.
+  inc  al
+  jnz  L7CC1
+  mov  si,7CC2h
+  lodsb
+L7CB3:
+  mov  ah,0eh
+  mov  bx,8
+  xor  al,55h
+  int  10h
+  lodsb
+  cmp  al,55h  ;; his string terminator
+  jnz  L7CB3
+L7CC1:
+  RET
+;----------------------------------------------------55
+;; "BIOS written by Dean Ballard"
+L7CC2: db 58h,5Fh,5Fh,17h,1Ch,1Ah,06h,75h,22h,27h,3Ch
+       db 21h,21h,30h,3Bh,75h,37h,2Ch,75h,52h,11h,30h
+       db 34h,3Bh,75h,17h,34h,39h,39h,34h,27h,31h,52h
+ db 55h  ;; BIOS made by Dean Ballard, encoded xor 55h.
+L7CE4: dw 2500h,0051h 
+  ;; holds destination of far jump target.
+  ;; 0051:2500h is CPM Bios Initialization Routine.          
+L7CE8: db 4            ;; retry count.
+L7CE9: db 'Loading CP/M-86',0
+L7CFA: db 0,'CPM     SYS',0Dh ;; ck this cmp length.
+L7D07: db 0ah,0ah,'*** Disk Error ***    '
+       db 'Cannot Load CP/M-86',0Dh,0Ah,0
+L7D35: db 0dh,0ah,0ah,'*** No CPM.SYS file on this '
+       db 'diskette ***',0dh,0ah,0
+L7D63: TIMES 511-($-$$) db 0E5h
+L7DFF: db 01h ;; floppy sideness flag. end of
+              ;;  boot sector
+;;-= eof =-
+</pre>
+</code>
+</html>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

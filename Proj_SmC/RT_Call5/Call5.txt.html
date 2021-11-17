@@ -1,0 +1,34 @@
+<html>
+<span style='font-family:"Courier New";mso-bidi-font-family:Arial'>
+<h3>
+-== About the Call 5 Legacy Interface ==-
+</h3>
+<h4>
+<p>
+This so called 'Call 5 Legacy Interface' began with the predecessor to pcDos, CP/M.  It is a Call to Location 0x0005 in the current code segment, which then revectors to the Operating System Services.  The CP/M API was carried forward into the earliest dos'es to ease code migration into the new Intel processor, the 8086 & 8088.  The humorous part is that the interface has been carried forward right through Win95, Win98 and into XP.  On these, it is embedded into command interpreter, CMD.EXE, which is a dpmi v.9 server [1] for commandline tools, .EXE and .COM executables.  This interface pertains to .COM executables only [2]; it operates by the Far Call found at location 0x0005 in the .COM Program Segment Prefix: CALLF  F01D:FEF0.  This is address 0x1000C0, after address wrap-a-round, becomes:   0000:00C0 JMPF   00A7:10AE, which is the vector into the handler for this Legacy API.  This is why the Legacy A20 address line support for address wraparound was required on later processors!
+</p>
+<p>
+The API is covered by the 86-DOS Programmer's Manual.  It is found here: http://www.patersontech.com/dos/manuals.aspx see page 7, second paragraph.  This is an emulation of CP/M File Control Blocks, the file system is FCB's but some of the fields are used differently from CP/M, so that is isn't quite CP/M FCB's and it isn't INT 21h File Handles either.  Thus the 'Call 5 Legacy Interface' file operations only see the current directory.  The dpmi server handles this legacy FCB emulation as part of supporting Dos .COM programs, and .EXE programs[2].
+</p>
+<p>
+I built a minimal small-c io library for this 'Call 5 Legacy Interface' because the effort mimics what is required to bootstrap the small-c compiler to one's own hobby OS or custom enviornment.
+</p>
+<p>
+Small-C makes minimal demands on an IO Library.  It requires 6 functions be implemented for IO: getc(){;} gets(){;} putc(){;} putchar(){;} fopen(){;} fclose(){;}.  Once these are implemented, small-c has the facilities it needs to self-compile.
+</p>
+<p>
+There is more depth to the API than I have implemented in C5LIB.C, so stubs for future functions are evident in the source.  I've used this library with success, but I don't claim it to be a finished or bug resistant version.  There are runtime console messages which clue how the file IO progress is proceeding.  The File IO portion of C5LIB require the initfcb: subroutine be run before small-c does file IO, so the main() block of small-c is modified to call this function, also, an exit() function was added to main() so that process cleanup can be controlled from the library subroutine.
+</p>
+<p>
+15 AUG 2008,<BR>
+01 JUL 2009;<BR>
+ [1] doesn't appear to be fully implemented.<BR>
+ [2] Actually can apply to .EXE's, as a PSP is prepended to them as well.<BR> 
+-= EOF =-
+</p>
+<HR>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

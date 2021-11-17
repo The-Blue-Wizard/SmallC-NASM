@@ -1,0 +1,31 @@
+<html>
+<P><I>
+Release 1.0, codegen version 0.2.7 ..
+- I changed names of identifiers to names more fitting to my eye, such as lval() function to eval() function, and the like.
+- I changed code generation to reflect dereferencing auto variables off the stack using BP, (SS:BP).  This is the first step to recodifying to a segment or section model.  Variables of external storage class are dereferenced thru DS:offset.  This works only because SS == DS, the rest of the step cannot be completed until the parser is improved to carry forward more information about a pointer pointing to 'object of storage class; auto or external'.  Instead of using a small .com memory model, the next major goal is employ separate stack, data, and code segmented model.  A further look into this seems to indicate to me that not enough information about the storage class of an indentifier is held in the parser state array used by eval().
+- I improved the code generation in a number of small ways that suggested themselves.
+- The syntax is still K&R, the code generated is still 80186ish.
+
+</I></P>
+<P>
+<A HREF="NCCR1.C.TXT.HTML">C Source to Release 1.0, codegen version 0.2.7</A>
+</P>
+<P><I>
+<A HREF="NCCR1.NSM.HTML">NASM output of Release 1.0, codegen version 0.2.7, ready to make.</A>
+</P></I>
+<P><I>
+<A HREF="nccr1.mak.html">NASM makefile for this project, outputs NCCR1.COM.</A>
+</P></I>
+
+</pre>
+</code>
+<P>
+<H5>
+12:52 PM 2/15/2009
+</H5>
+</p>
+</html>
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

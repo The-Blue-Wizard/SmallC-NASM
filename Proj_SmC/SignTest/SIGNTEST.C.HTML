@@ -1,0 +1,396 @@
+<html>
+<I><P>
+This is an example for using NCC and the C5LIB.C, (actually the 'pause at exit' version C5LIBp.C).  The Library is included first in the source so that the Library's mainmain() will control program flow of startup, main, and exit.
+</P></I>
+<code>
+<pre>
+/***------------------------------------------***/
+/** Module: SIGNTEST.C  Orig: CTESTC.C         **/
+/** modified by: s_dubrovich@yahoo.com         **/
+/** Last: 17 AUG 2008  Init: 15 AUG 2008       **/
+/** -chged useage of strings, to, useage of ptr**/
+/**  to strings.                               **/
+/** -example of use of Call_5 Library          **/
+/***------------------------------------------***/
+/*** C 5 L I B . C   S T A R T U P  		*/
+/***------------------------------------------***/
+#define NULL 0
+#include C5LIBp.C
+/***------------------------------------------***/
+
+/* Small-c Comparison Test Program
+ *
+ * This program tests the various comparison operations
+ * performed by the Small-c language.
+ *
+ */
+
+#define SOK	"Valid"
+#define SHOBAD	"****Invalid"
+
+char *AOK;
+char *NOK;
+
+main()
+{
+	int i,j;
+	int *ii,*jj;
+  /** create ptr to strs to pass to puts, instead of quoted str const **/
+	AOK = SOK;
+	NOK = SHOBAD;
+
+	puts("**********(Signed Tests)**********");NLfn();
+	teqs();		/* equal */
+	tnes();		/* not equal */
+	tges();		/* greater than or equal to */
+	tles();		/* less than or equal to */
+	tgts();		/* greater than */
+	tlts();		/* less than */
+	puts("*****(Signed Tests Completed)*****");NLfn();
+
+}  /** EO main() **/
+
+tab(){
+	putchar(9);
+	}
+
+teqs(){
+	/* First test all possible combinations of ==
+	   for signed integers. */
+	puts("Testing == for 0:0");
+	if(0==0){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing == for 1:1");
+	if(1==1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing == for -1:-1");
+	if(-1==-1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing == for 1:-1");
+	if(1==-1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing == for -1:1");
+	if(-1==1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing == for 0:1");
+	if(0==1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing == for 0:-1");
+	if(0==-1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	}
+
+tnes(){
+	/* First test all possible combinations of !=
+	   for signed integers. */
+	puts("Testing != for 0:0");
+	if(0!=0){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing != for 1:1");
+	if(1!=1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing != for -1:-1");
+	if(-1!=-1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing != for 1:-1");
+	if(1!=-1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing != for -1:1");
+	if(-1!=1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing != for 0:1");
+	if(0!=1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing != for 0:-1");
+	if(0!=-1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	}
+
+
+tges(){
+	/* First test all possible combinations of >=
+	   for signed integers. */
+	puts("Testing >= for 0:0");
+	if(0>=0){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing >= for 1:1");
+	if(1>=1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing >= for -1:-1");
+	if(-1>=-1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing >= for 1:-1");
+	if(1>=-1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing >= for -1:1");
+	if(-1>=1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing >= for 0:1");
+	if(0>=1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing >= for 0:-1");
+	if(0>=-1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	}
+
+
+tles(){
+	/* First test all possible combinations of <=
+	   for signed integers. */
+	puts("Testing <= for 0:0");
+	if(0<=0){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing <= for 1:1");
+	if(1<=1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing <= for -1:-1");
+	if(-1<=-1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing <= for 1:-1");
+	if(1<=-1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing <= for -1:1");
+	if(-1<=1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing <= for 0:1");
+	if(0<=1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing <= for 0:-1");
+	if(0<=-1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	}
+
+
+tgts(){
+	/* First test all possible combinations of >
+	   for signed integers. */
+	puts("Testing > for 0:0");
+	if(0>0){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing > for 1:1");
+	if(1>1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing > for -1:-1");
+	if(-1>-1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing > for 1:-1");
+	if(1>-1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing > for -1:1");
+	if(-1>1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing > for 0:1");
+	if(0>1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing > for 0:-1");
+	if(0>-1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	}
+
+
+tlts(){
+	/* First test all possible combinations of <
+	   for signed integers. */
+	puts("Testing < for 0:0");
+	if(0<0){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing < for 1:1");
+	if(1<1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing < for -1:-1");
+	if(-1<-1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing < for 1:-1");
+	if(1<-1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	puts("Testing < for -1:1");
+	if(-1<1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing < for 0:1");
+	if(0<1){
+		tab();puts(AOK);NLfn();
+		}
+	else{
+		tab();puts(NOK);NLfn();
+		}
+	puts("Testing < for 0:-1");
+	if(0<-1){
+		tab();puts(NOK);NLfn();
+		}
+	else{
+		tab();puts(AOK);NLfn();
+		}
+	}
+/** eof signtest.c **/
+</pre>
+</code>
+<P>
+<H5>
+8:13 AM 8/17/2008
+</H5>
+</p>
+</html>
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

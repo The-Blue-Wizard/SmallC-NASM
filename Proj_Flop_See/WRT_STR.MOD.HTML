@@ -1,0 +1,115 @@
+<PRE><CODE>
+;;PAGEWIDTH 80
+;;TITLE 'WRITE STRING MODULE'
+;;---------------------------------------------------55
+;; Module Name: wrt_str .mod By: s_dubrovich@yahoo.com
+;; Last Update: 16 DEC 2007  Init: 23 NOV 2007
+;; Vers: 0.1.5  Goal: Write Str, module form. 
+;; Desc:
+;; Subroutine Module. Int10h AH.13h
+;; EndDesc:
+;;
+;; SubrLst:     //Code Labels meant for Global Use.
+;; WriteString:
+;; EndSubrLst:
+;;
+;; ExternLst:   //Code Labels refer to another module.
+;; EndExternLst:
+;;
+;; GlobalLst:   //Our Data Labels meant for Global Use.
+;; EndGlobalLst:
+;;
+;; ExternDataLst: //Data Labels in Another Module.
+;; VidRow    // default Row ..all in VID_SERV.MOD
+;; VidCol    // default Col
+;; Vid_Pg    // default Video Page
+;; VidAttr   // default blk char on grn
+;; VidMPtr   // default msg
+;; VidMLen   // string length
+;; EndExternDataLst:
+;;
+;; ReqdFNL:     //List Function Modules we Require
+;; VID_SERV.MOD // Parent.
+;; EndReqd FNL:
+;;---------------------------------------------------55
+;; 29-Nov-07 10:56:49 PM
+;;---------------------------------------------------55
+  [SECTION .cseg]
+;;---------------------------------------------------55
+;; Write String, INT 10h
+;;
+;; AH.13h
+;; AL.Fn_Mode 0..3 [a]
+;; BH.Display_Pg
+;; BL.Attribute  [for Modes 0..1]
+;; CX.Str_Len
+;; DH.Row
+;; DL.Col
+;; ES:BP.Ptr_to_String
+;;
+;; FN_Modes:
+;;  0 Attr in BL, String of Char, Cursor.no_update
+;;  1 Attr in BL, String of Char, Cursor.update
+;;  2 String of Char AND Attr, Cursor.no_update
+;;  3 String of Char AND Attr, Cursor.update
+;;
+
+WriteString: ;; Conout String. Parameters pre-poked.
+  mov  [StorES],ES
+  push DS    ;; use DS as src of str
+  pop  ES
+  pusha
+  mov  ah,13h
+  mov  al,1
+  mov  bh,[Vid_Pg]
+  mov  bl,[VidAttr]	
+  mov  cx,[VidMLen]
+  mov  dh,[VidRow]
+  mov  dl,[VidCol]
+  push bp
+  mov  bp,[VidMPtr]
+  INT  10h
+  pop  bp
+  popa
+  mov  ES,[StorES]
+;-;  call PrntLocCalc ;-; let caller do it separately
+  RET
+
+  [SECTION .dseg] ;; See Vid_Serv.Mod
+StorES dw 0
+;;---------------------------------------------------55
+;; Print Location Calc. (next loc)
+;; Calc RowCol from current plus VidMLen.
+;; Then update VidParams.
+  [SECTION .cseg]
+PrntLocCalc:
+  mov  cx,[VidMLen]      ;; Length just printed.
+  movzx ax,[byte VidCol] ;; Previous starting location.
+  add  ax,cx  ;; Col plus Len Msg
+  mov  cl,[VidColMax]    ;; 79,0..79
+  div  cl     ;; AL.quot->Row+, AH.remainder->Col
+  mov  [VidCol],ah
+  add  [VidRow],al  ;;??trap maxrow??
+  RET
+;;---------------------------------------------------55
+;;
+putc: ;;char in AL
+  pusha
+  mov  [MyChar],al
+  mov  [VidMPtr],word MyChar
+  mov  [VidMLen],word 1
+  call WriteString
+  call PrntLocCalc
+  popa
+  RET
+  [SECTION .dseg]
+MyChar db 3Fh,3Fh
+;;---------------------------------------------------55
+;;  --EO WRT_STR MODULE--
+;;---------------------------------------------------55
+</CODE></PRE>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

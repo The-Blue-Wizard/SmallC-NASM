@@ -1,0 +1,60 @@
+<html>
+<I><P>
+FLOP_SEE.NSM and associated moduless are the NASM source for a utility to view sectors on a floppy diskette in the A:\ drive.  This program works in win98 just fine as is, click and go.  The program will work in XP if a couple of restrictions are observed.  The first restriction is it must be run under a debugger such as DEBUG.EXE because of the inner workings of XP.  The second restriction for XP is that the floppy to be viewed must be of a fat12 format, also because of the inner working of XP.  To run DEBUG...
+
+Open the 'Command Prompt' utility.  This can be found here: [start] [All Programs] [Accessories] [Command Prompt], which gives something like the following:
+</I><PRE>
+Microsoft Windows XP [Version 5.1.2600]
+(C) Copyright 1985-2001 Microsoft Corp.
+
+C:\Documents and Settings\USER1>
+
+-presumeably you have FLOP_SEE.COM on your desktop, so change to that directory-
+
+C:\Documents and Settings\USER1>cd desktop
+
+C:\Documents and Settings\USER1\Desktop>debug flop_see.com
+-_
+With a floppy placed in the floppy drive, give DEBUG the G command to launch Flop_See.
+-g<cr>
+
+Press 'Q' or 'q' a couple of times to quit, when you are done.  There is an on screen menu of commands...
+
+Commands:  Q,q := Quit.  - := decrement sector, + := increment sector.
+R,r := reloggin disk to CHS=0,0,1  L,l := New Diskette Login to current CHS.
+T,t := increment to next track.  C,c := user select cylinder.
+H,h := toggle between head 0,1.
+S,s := Seek to sector index in current track buff.
+</PRE><I>
+Flop_See uses the RomBios interrupt service routines only, so with minor modification to the org offset, it will run from a 'load and go' hobby OS boot disk as a Real Mode Utility.
+</P></I>
+<HR>
+<P>
+<I>Components:</I>
+<UL><LI><A HREF="fsee.mak.html">fsee.mak</A>  -The MakeFile.</LI></UL>
+<UL><LI><A HREF="FLOP_SEE.NSM.HTML">FLOP_SEE.NSM</A>  -The Main Module.</LI></UL>
+
+Supporting Functions Modules..
+<UL>
+<LI><A HREF="DISKIO.MOD.HTML">DISKIO.MOD</A></LI>
+<LI><A HREF="FILL_SCR.MOD.HTML">FILL_SCR.MOD</A></LI>
+<LI><A HREF="INBUFFER.MOD.HTML">INBUFFER.MOD</A></LI>
+<LI><A HREF="POKESTR.MOD.HTML">POKESTR.MOD</A></LI>
+<LI><A HREF="PRT_CMDS.MOD.HTML">PRT_CMDS.MOD</A></LI>
+<LI><A HREF="SHOW_DTA.MOD.HTML">SHOW_DTA.MOD</A></LI>
+<LI><A HREF="VID_SERV.MOD.HTML">VID_SERV.MOD</A></LI>
+<LI><A HREF="WRT_STR.MOD.HTML">WRT_STR.MOD</A></LI>
+</UL>
+</P>
+<HR>
+<P>
+<H5>
+8:39 PM 2/11/2009
+</H5>
+</p>
+</html>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

@@ -1,0 +1,154 @@
+<html>
+<span style='font-family:"Courier New";mso-bidi-font-family:Arial'>
+<b><i>-borrowed from the NASM Documentation...</i></b>
+<pre>
+--------------------------------------------------------------------------------
+
+6.1 bin: Flat-Form Binary Output
+
+--------------------------------------------------------------------------------
+
+The bin format does not produce object files: it generates nothing in the output
+file except the code you wrote. Such 'pure binary' files are used by MS-DOS:
+.COM executables and .SYS device drivers are pure binary files. Pure binary
+output is also useful for operating system and boot loader development.
+<b><i>..otherwise known as machine code, directly readable and executable by the CPU..</i></b>
+
+The bin format supports multiple section names. For details of how nasm handles
+sections in the bin format, see section 6.1.3.
+<b><i>..this feature is essential to what we are after..</i></b>
+
+Using the bin format puts NASM by default into 16-bit mode (see section 5.1). In
+order to use bin to write 32-bit code such as an OS kernel, you need to
+explicitly issue the BITS 32 directive.
+<b><i>..however a BITS 32 Section must be described by a PM descriptor as 32bit..</i></b>
+
+bin has no default output file name extension: instead, it leaves your file name
+as it is once the original extension has been removed.  Thus, the default is for
+NASM to assemble binprog.asm into a binary file called binprog.
+
+--------------------------------------------------------------------------------
+
+6.1.1 ORG: Binary File Program Origin
+
+--------------------------------------------------------------------------------
+
+The bin format provides an additional directive to the list given in chapter 5:
+ORG. The function of the ORG directive is to specify the origin address which
+NASM will assume the program begins at when it is loaded into memory.
+
+For example, the following code will generate the longword 0x00000104:
+
+        org     0x100 
+        dd      label 
+label:
+
+Unlike the ORG directive provided by MASM-compatible assemblers, which allows
+you to jump around in the object file and overwrite code you have already 
+generated, NASM's ORG does exactly what the directive says: origin. Its sole
+function is to specify one offset which is added to all internal address 
+references within the section; it does not permit any of the trickery that 
+MASM's version does. See section 10.1.3 for further comments.
+<b><i>..I admit, avoiding org nnnn takes abit of adjustment, after that period, it
+isn't missed.  Even in DOS .com we can forget it if we manage our own sections.
+I used it in the lame HELLO.COM, true, well, you'll see for yourself..</i></b>
+
+--------------------------------------------------------------------------------
+
+6.1.2 bin Extensions to the SECTION Directive
+
+--------------------------------------------------------------------------------
+
+The bin output format extends the SECTION (or SEGMENT) directive to allow you to
+specify the alignment requirements of segments. This is done by appending the
+ALIGN qualifier to the end of the section-definition line. For example,
+
+section .data   align=16
+
+switches to the section .data and also specifies that it must be aligned on a
+16-byte boundary.
+
+The parameter to ALIGN specifies how many low bits of the section start address
+must be forced to zero. The alignment value given may be any power of two.
+<b><i>..this too is an essential feature, as we will want to our sections to be sized
+to 16 byte alignment, which is also a cache line length..</i></b>
+
+--------------------------------------------------------------------------------
+
+6.1.3 Multisection support for the BIN format.
+
+--------------------------------------------------------------------------------
+
+The bin format allows the use of multiple sections, of arbitrary names, besides
+the "known" .text, .data, and .bss names.
+
+Sections may be designated progbits or nobits. Default is progbits (except .bss,
+which defaults to nobits, of course).
+
+Sections can be aligned at a specified boundary following the previous section
+with align=, or at an arbitrary byte-granular position with start=.
+
+Sections can be given a virtual start address, which will be used for the
+calculation of all memory references within that section with vstart=.
+
+Sections can be ordered using follows=<section> or vfollows=<section> as an
+alternative to specifying an explicit start address.
+
+Arguments to org, start, vstart, and align= are critical expressions. See
+section 3.8. E.g. align=(1 << ALIGN_SHIFT) - ALIGN_SHIFT must be defined before
+it is used here.
+
+Any code which comes before an explicit SECTION directive is directed by default
+into the .text section.
+
+If an ORG statement is not given, ORG 0 is used by
+default.
+
+The .bss section will be placed after the last progbits section, unless start=,
+vstart=, follows=, or vfollows= has been specified.
+
+All sections are aligned on dword boundaries, unless a different alignment has
+been specified.
+ 
+Sections may not overlap.
+
+Nasm creates the section.< sectionname >.start for each section, which may be
+used in your code. 
+
+<b><i>..It needs to be said that .text is a default section which is generated regard-
+less of whether we describe it or not.  It is empty and of no consequence if we
+don't use it.  This has an interesting side effect.  We could use the .text
+section, which will be first in the .BIN file, as a data record describing the
+sections which make up our BIN file for our custom Loader.  The .text section
+name is a misnomer, a consequence of history, when it really held code.  But, it
+doesn't have to hold code..</i></b>
+
+--------------------------------------------------------------------------------
+
+6.1.4 Map files
+
+--------------------------------------------------------------------------------
+
+Map files can be generated in -f bin format by means of the [map] option. Map
+types of all (default), brief, sections, segments, or symbols may be specified.
+Output may be directed to stdout (default), stderr, or a specified file. E.g.
+[map symbols myfile.map]. No "user form" exists, the square brackets must be
+used.
+<b><i>..The map file is very handy for chasing down certain section related errors,
+and checking relative addresses.  This is not a command line parameter, it is an
+assembler directive, as a statement in the beginning of the main source code
+file.  Typically I use [MAP ALL MYFILE.MAP]..</i></b>
+
+--------------------------------------------------------------------------------
+
+<p><i style='mso-bidi-font-style:normal'><span style='font-size:10.0pt;
+font-family:"Courier New";mso-bidi-font-family:Arial'><a
+href="../../../index.htm">BACK to main page</a><o:p></o:p></span></i></p>
+
+</pre>
+</html>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

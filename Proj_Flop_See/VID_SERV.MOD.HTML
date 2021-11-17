@@ -1,0 +1,200 @@
+<PRE><CODE>
+;;PAGEWIDTH 80
+;;TITLE 'VIDEO SERVICES MODULE'
+;;---------------------------------------------------55
+;; Module Name: vid_serv.mod By: s_dubrovich@yahoo.com
+;; Last Update: 16 DEC 2007  Init: 24 NOV 2007
+;; Vers: 0.1.5  Goal: Video Serv., module form. 
+;; Desc:
+;; Module Parent to Video Services.
+;; EndDesc:
+;;
+;; SubrLst:     //Code Labels meant for Global Use.
+;; VidInit:
+;; VidStat:
+;; SetPgCurs:
+;; GetPgCurs:
+;; VidDeInit:  // restore entry values before exit.
+;; EndSubrLst:
+;;
+;; ExternLst:   //Code Labels refer to another module.
+;; EndExternLst:
+;;
+;; GlobalLst:   //Our Data Labels meant for Global Use.
+;; VidRow    // default Row
+;; VidCol    // default Col
+;; Vid_Pg    // default Video Page
+;; VidAttr   // default blk char on grn
+;; VidMPtr   // default msg
+;; VidMLen   // string length
+;; VidRowMax // 0..24, ==25
+;; VidColMax // 0..79, ==80
+;; CursNdx   // 0..1999, 2nd cursor index.
+;; EndGlobalLst:
+;;
+;; ExternDataLst:  //Data Labels in Another Module.
+;; EndExternDataLst:
+;;
+;; ReqdFNL:     //List Function Libs. we Require
+;; EndReqd FNL:
+;;---------------------------------------------------55
+;; 16-Dec-07 04:27:18 PM
+;;---------------------------------------------------55
+;; -f bin -l vid_serv.lst vid_serv.mod
+;;---------------------------------------------------55
+;; - S U B R O U T I N E S -
+struc ScrnPg
+  .PgNum:     resb 1
+  .PgMode:    resb 1
+  .CursCol:   resb 1
+  .CursRow:   resb 1
+  .CursTopLn: resb 1
+  .CursBotLn: resb 1
+endstruc
+
+  [SECTION .cseg]
+VidInit: ;; get&save initial/current Vid State.
+  mov  ah,0Fh
+  INT  10h
+  mov  [VidColsOld],ah
+  mov  [VidModeOld],al
+  mov  [VidMode],al    ;; copy to current.
+  mov  [VidPgOld],bh
+  mov  [Vid_Pg],bh     ;; copy to current.
+  RET
+VidDeInit: ;; reset to orig. Pg#, Mode
+  ;; set Pg#
+  mov  al,[VidPgOld]
+  mov  ah,5
+  INT  10h
+  ;; set Mode
+  mov  al,[VidModeOld]
+  mov  ah,0
+  INT  10h
+  RET
+VidStat:
+  RET
+;;---------------------------------------------------55
+;; Entry: AH.03, BH. pg# = Caller Sets Vid_Pg 1ST
+;;   by setting up VidParams prior to call.
+;; Retns: DH.RowPos, DL.ColPos, CH.BotScanLn,
+;;        CL.TopScanLn
+GetPgCurs: ;; of designated page into pg struc.
+  mov  ah,3
+  mov  bh, byte [Vid_Pg]  ;;
+  INT  10h  
+  movzx bx, byte [Vid_Pg]
+  add  bx,bx           ;; dbl for index
+  mov  di,[bx+VidTbl]  ;; idx correct struc 
+  mov  word [di + ScrnPg.CursCol],dx   ;; mov 2 params
+  mov  word [di + ScrnPg.CursTopLn],cx ;; in 1 word ea.
+  mov  byte [VidCol],dl
+  mov  byte [VidRow],dh
+  RET
+;;---------------------------------------------------55
+;; Entry: AH.02, BH. pg#, DH.RowPos, DL.ColPos
+;;   Caller Presets VidParams struc before calling.
+SetPgCurs: ;; from pg struc into bios state.
+  mov  ax,[word VidCol] ;; 2 params.
+  mov  cl, byte [Vid_Pg]
+  movzx bx,cl
+  add  bx,bx
+  mov  si,[bx+VidTbl]
+  mov  word [si + ScrnPg.CursCol],ax ;; Col&Row
+  mov  dx,ax
+  xor  bx,bx
+  mov  bh,cl
+  mov  ax,0200h
+  INT  10h
+  RET
+;;---------------------------------------------------55
+  [SECTION .dseg]
+  ;;
+VidColsOld db 0 ;; AH.#col
+VidModeOld db 0 ;; AL.Mode'Orig to restore on exit
+VidPgOld   db 0 ;; BH.#Active_Page
+  ;;
+  ;; default & current values used by WriteString:
+  ;; The defaults are current until overwritten.
+VidParams:   ;; Current Context Params
+VidMode db 0 ;; 
+VidCol  db (39-((Len000-Msg000)>>2)) ;; default Col
+VidRow  db 0      ;; default Row
+Vid_Pg  db 0      ;; default Video Page
+VidAttr db 1Fh    ;; default wht char on blu
+VidMPtr dw Msg000 ;; default msg
+VidMLen dw (Len000-Msg000)
+VidRowMax db 24   ;; 0..24, ==25
+VidColMax db 79   ;; 0..79, ==80
+CursNdx dw 0      ;; 2nd cursor position 0..1999
+Msg000 db '-Video Services Msg.-',0dh,0ah
+Len000:
+
+;;---------------------------------------------------55
+VidTbl:
+ VP0: dw VidPg0
+ VP1: dw VidPg1
+ VP2: dw VidPg2
+ VP3: dw VidPg3, 0FFFFh
+ 
+VidPg0:
+ istruc ScrnPg
+  at ScrnPg.PgNum,     db 0
+  at ScrnPg.PgMode,    db 3  ;;  3 80x25 Color Text
+  at ScrnPg.CursCol,   db 0  ;; DL
+  at ScrnPg.CursRow,   db 0  ;; DH
+  at ScrnPg.CursTopLn, db 0Fh ;; CL.0Fh
+  at ScrnPg.CursBotLn, db 0Ch ;; CH.0Ch
+ iend
+VidPg1:
+ istruc ScrnPg
+  at ScrnPg.PgNum,     db 0
+  at ScrnPg.PgMode,    db 3  ;;  3 80x25 Color Text
+  at ScrnPg.CursCol,   db 0
+  at ScrnPg.CursRow,   db 0
+  at ScrnPg.CursTopLn, db 0Fh ;; CL.0Fh
+  at ScrnPg.CursBotLn, db 0Ch ;; CH.0Ch
+ iend
+VidPg2:
+ istruc ScrnPg
+  at ScrnPg.PgNum,     db 0
+  at ScrnPg.PgMode,    db 3  ;;  3 80x25 Color Text
+  at ScrnPg.CursCol,   db 0
+  at ScrnPg.CursRow,   db 0
+  at ScrnPg.CursTopLn, db 0Fh ;; CL.0Fh
+  at ScrnPg.CursBotLn, db 0Ch ;; CH.0Ch
+ iend
+VidPg3:
+ istruc ScrnPg
+  at ScrnPg.PgNum,     db 0
+  at ScrnPg.PgMode,    db 3  ;;  3 80x25 Color Text
+  at ScrnPg.CursCol,   db 0
+  at ScrnPg.CursRow,   db 0
+  at ScrnPg.CursTopLn, db 0Fh ;; CL.0Fh
+  at ScrnPg.CursBotLn, db 0Ch ;; CH.0Ch
+ iend
+
+;; Common Video Modes:
+;;  2 80x25 B&W   Text on Color Monitor
+;;  3 80x25 Color Text 
+;;  7 80x25 B&W   Text Monochrome Monitor.
+;;  -Graphics Modes-
+;;  4 320x200   4 color ega
+;;  5 320x200   2  B&W  ega
+;;  6 640x200   2  B&W  ega
+;; 13 320x200  16 color ega
+;; 14 640x200  16 color ega
+;; 15 640x350  B&W      ega
+;; 16 640x350  16 color ega
+;; 18 640x480  16 color vga
+;; 19 320x200 256 color vga
+;; Add'l per Controller Type
+;;---------------------------------------------------55
+;;  --EO SUBROUTINE MODULE : VID_SERV.MOD--
+;;---------------------------------------------------55
+</CODE></PRE>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

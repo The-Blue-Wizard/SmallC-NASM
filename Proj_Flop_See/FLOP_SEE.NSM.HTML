@@ -1,0 +1,539 @@
+<PRE><CODE>
+;;PAGEWIDTH 80
+;;TITLE 'FLOPPY SECTOR SHOW MODULE'
+[MAP ALL FLOP_SEE.MAP]
+;;---------------------------------------------------55
+;; Module Name: flop_see.nsm By: s_dubrovich@yahoo.com
+;; Last Update: 08-Feb-09 03:49:08 PM
+;; Prev Update: 13 FEB 2008  Init: 19 JAN 2008
+;; Vers: 0.0.B  Goal: floppy diskette subroutines.
+;; Desc:
+;;  implement and test diskette raw read subroutines.
+;;  pcDos .COM version for cmd.exe
+;; EndDesc:
+;;
+;; SubrLst:     //Code Labels meant for Global Use.
+;;  none- Main Program.
+;; EndSubrLst:
+;;
+;; ExternLst:   //Code Labels refer to another module.
+;;  VidInit:        //VID_SERV.MOD
+;;  Fill_Scr:       //FILL_SCR.MOD
+;;  SetPgCurs:      //VID_SERV.MOD
+;;  Read_Track:     //DISKIO.MOD
+;;  Sho_DTA:        //SHOW_DTA.MOD
+;;  get_usr_input:  //INBUFFER.MOD
+;;  Get_Keyboard:   //INBUFFER.MOD
+;;  SetPgCurs:      //VID_SERV.MOD
+;;  GetHexDigit:    //INBUFFER.MOD
+;; EndExternLst:
+;;
+;; GlobalLst:   //Our Data Labels meant for Global Use.
+;; EndGlobalLst:
+;;
+;; ExternDataLst:  //Data Labels in Another Module.
+;;  [half_sector_index] //SHOW_DTA.MOD
+;;  [disp_rec_index]    //SHOW_DTA.MOD
+;;  [head]              //DISKIO.MOD
+;;  [track]             //DISKIO.MOD
+;;  [Stat_Byte]         //DISKIO.MOD
+;;  [pStatMsg]          //DISKIO.MOD
+;;  [S_MsgLen]          //DISKIO.MOD
+;;  [FAttr]             //FILLSCR.MOD
+;;  [BkgrdChar]         //FILLSCR.MOD
+;; EndExternDataLst:
+;;
+;; ReqdMOD:     //List Function MODules we Require.
+;;  DISKIO.MOD
+;;  VID_SERV.MOD
+;;  WRT_STR.MOD
+;;  SHOW_DTA.MOD
+;;  POKESTR.MOD
+;;  FILL_SCR.MOD
+;;  INBUFFER.MOD
+;;  PRT_CMDS.MOD
+;; EndReqdMOD:
+;;---------------------------------------------------55
+;;---------------------------------------------------55
+;; STATUS: rd_trk, disp_trk, chg_head,
+;;  chg_trk (cylinder) ok.
+;; NEEDS: goto_sector, missing diskette handler.
+;;  12-Feb-08 05:55:30 PM
+;;---------------------------------------------------55
+;; -=nasm=-
+;; -f bin -l flop_see.lst -o flop_see.run flop_see.nsm
+;; .if. pcdos
+;; -f bin -l flop_see.lst -o flop_see.com flop_see.nsm
+;;---------------------------------------------------55
+;;  Code Start
+;;---------------------------------------------------55 
+;; NASM creates the section.<secname>.start for each 
+;;  section, which may be used in your code.
+;; Nasm conditionals test for Z,NZ where (%IF Expr)
+;;  succeeds if Val of Expr is non-zero.
+
+TRUE     equ 1
+FALSE    equ TRUE-TRUE  
+Testing equ FALSE
+
+FSGS  equ TRUE  ;; use FSeg and GSeg Segments.
+pcDos equ TRUE  ;;Make as .com; don't forget to
+                ;; rename .bin to .com
+;;---------------------------------------------------55
+%IF pcDos
+  SECTION .cseg vstart=0100h ;;initial
+%ELSE
+  SECTION .cseg vstart=0 align=16
+%ENDIF
+;;---------------------------------------------------55
+mod_cstart:
+;;--- setup runtime segment registers from current CS
+;; Note: this assumes real mode contiguous binary.
+;; AX accumulated segment, CX const start segment
+;; BX cmp with previous segm, DX segm start.
+
+  mov  ax,CS
+  mov  cx,ax
+  mov  bx,section..cseg.start ;; prep cmp, rela. 0000h
+  shr  bx,4        ;; conv offset to its segment
+%IF pcDos
+  add  ax,10h      ;; adj for 0100h orging
+%ENDIF
+do_ds:
+  mov  dx,section..dseg.start
+  shr  dx,4        ;; conv offset to its segment
+  add  dx,ax       ;; AX has start segment
+  mov  DS,dx       ;; set true DS as load segm + offs
+  mov  [sav_ds_base],dx
+  mov  [sav_cs_base],ax
+
+do_es:
+  mov  dx,section..eseg.start
+  shr  dx,4        ;; make segm
+  add  dx,ax       ;; AX has start segment
+  mov  ES,dx
+  mov  [sav_es_base],dx
+
+;;== CS,DS,ES Set. ==
+;;== Set FS,GS ==
+
+do_fs:
+;;%IF FSGS  ;; use FS,GS Segments ?nested IFs?-Allowed.
+  mov  dx,section..fseg.start
+  shr  dx,4        ;;segment offset of .FSEG
+  add  dx,ax       ;; AX has start segment
+  mov  FS,dx
+  mov  [sav_fs_base],dx  ;; test
+
+do_gs:
+  mov  dx,section..gseg.start
+  shr  dx,4        ;;segment offset of .GSEG
+  add  dx,ax
+  mov  GS,dx
+  mov  [sav_gs_base],dx ;; test
+;;%ENDIF
+
+do_ss:
+  mov  dx,section..sseg.start
+  shr  dx,4        ;;segment offset of .SSEG
+  add  dx,ax
+  mov  SS,dx       ;;Put off Stack until after Data.
+  mov  [sav_ss_base],ax
+
+prep_sp:
+  mov  sp,stacktop ;;offset in SSEG
+  mov  bp,sp       ;; start with a known value...
+  sub  bp,2
+  push bp          ;;now bp==[sp]==sp and this
+          ;;represents a known start state where
+          ;; this is the root of a possible chain
+          ;; of stack frames with bp as a link to
+          ;; a previous stack frame, or itself [head].
+;;===================================================55
+;;    M A I N
+;;===================================================55
+main:
+  call ModInit
+  call ModStart
+;;  call ModStat
+;;---exit program---
+alldone:  ;;return to here, exit.
+;; if dos, exit this way...
+;;%IF pcDos
+;;  mov ax,4C00h
+;;  int 21h
+;;%ELSE         ;; binary exit thru RomBios.
+  mov  ah,0
+  int  16h    ;; pause until keypress.
+  int  19h    ;; reboot.
+;;%ENDIF
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;;---------------------------------------------------55
+;;  Data Start
+;;---------------------------------------------------55
+  SECTION .dseg vstart=0 align=16
+mod_dstart:
+sav_cs_base: dw 0
+sav_ds_base: dw 0
+sav_es_base: dw 0
+sav_fs_base: dw 0
+sav_gs_base: dw 0
+sav_ss_base: dw 0
+sav_x1_base: dw 0  ;; padding
+sav_x2_base: dw 0  ;; padding to 16 bytes.
+by_whom:  db 's_dubrovich@yahoo.com'
+date_mod: db ' 06 JAN 2009 ',0
+vers:     db 'v0.0.8'
+  align 16, db 20h
+;;---------------------------------------------------55
+;; --==** Initial Selectors Declaration **==--
+  [SECTION .eseg vstart=0 align=16]
+  [SECTION .fseg vstart=0 align=16]
+  [SECTION .gseg vstart=0 align=16]
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;;---------------------------------------------------55
+;; Module Execution
+;;---------------------------------------------------55
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;; Commands:
+;; Q,q := Quit.
+;; L,l := New Diskette Login to current CHS, to cmp.
+;; R,r := reloggin disk to CHS := 0,0,1
+;; - := decrement sector, + := increment sector,
+;; H,h := toggle between head 0,1.
+;; T,t := increment to next track.
+;; C,c := user select cylinder.
+;; S,s := Seek to sector index in current track buff.
+
+  [SECTION .cseg]
+Lxit:  ;; for quit.
+  RET
+ModStart:
+  ;; reset index to beginning of buffer, S=01.
+  mov  [disp_rec_index],byte 0
+
+ModStart2:  ;; keep current S=nn.
+   ;; returns with CF set if rd error, else CF clear.
+  call Read_Track  ;; with default values into DTA.
+  jnc  Read_OK
+  call Read_Error
+   ;; fall thru or retry ?
+  jmp  ShoHlfSect
+Read_OK:
+  call Clear_Err
+ShoHlfSect:
+  call Sho_DTA     ;; display 1/2 sector per call.
+   ;; get user command; Q,+,-, or T,S,H
+   ;; re inbuffer.mod  -->AL.chr
+   ;; call Parse_Cmd
+;; Prompt
+  mov  bx,[word VidCol]
+  push bx
+  mov  al,'?'
+  call putc
+  pop  bx
+  mov  [VidCol],bx
+  call SetPgCurs     ;; restore cursor location
+  call Get_Keyboard  ;; -->AL.chr
+
+;; .if. 'Q' or 'q' 'Quit.
+  cmp  al,'q'  ;;lower case
+  je   Lxit
+  cmp  al,'Q'  ;;upper case
+  je   Lxit
+
+;;- - - - - - - - - - - - - - - - - - - - - - - - - -55
+;; .if. 'L','l','R','r' 'refresh by rereading
+;; 'L,l' allows login new disk at same current CHS.
+
+  cmp  al,'L'
+  je   ModStart2
+  cmp  al,'l'
+  je   ModStart2
+;; 'R,r' Relogs to CHS := 0,0,1
+  cmp  al,'R'
+  je   Relogin
+  cmp  al,'r'
+  je   Relogin
+  jmp  Seekpre
+;;---------------------------------------------------;;
+Relogin:  ;; sets c,h,s := 0,0,1 
+  mov  [track],byte 0  ;; cylinder
+  mov  [head],byte 0
+  jmp  ModStart
+
+;;- - - - - - - - - - - - - - - - - - - - - - - - - -55
+;; .if. '-' 'sector.
+Seekpre:
+  cmp  al,'-'  ;;lower case
+  je   .Ldodec
+  cmp  al,'_'  ;;upper case
+  je   .Ldodec
+  jmp  Seeksect
+
+.Ldodec:  ;; .else. 'decrement sector half index
+  cmp  byte [disp_rec_index],0
+  jne  .Ldec
+  mov  [disp_rec_index],byte 35
+  jmp  ShoHlfSect
+.Ldec:
+  dec  byte [disp_rec_index]
+  jmp  ShoHlfSect
+
+;; .if. '+' or '=' 'increment sector half index
+Seeksect:
+  cmp  al,'='  ;;lower case
+  je   .Ldoinc
+  cmp  al,'+'  ;;upper case
+  je   .Ldoinc
+  jmp  .Lnxtcmd
+         
+.Ldoinc:  ;; rec index limit per trk.
+  cmp  [disp_rec_index],byte 35
+  jne  .Lnxt
+  mov  [disp_rec_index],byte 0
+  jmp  ShoHlfSect
+.Lnxt:
+  inc  byte [disp_rec_index]
+  jmp  ShoHlfSect
+
+;;- - - - - - - - - - - - - - - - - - - - - - - - - -55
+;; test for T-C, S, H; req's trk chg, more user input.
+.Lnxtcmd:
+  cmp  al,'h' ;; change head & read track
+  je   .Ldoinchead
+  cmp  al,'H'
+  je   .Ldoinchead
+  jmp  .Lcktrk
+.Ldoinchead: ;; for now, floppy, toggle hd reread trk.
+  test byte [head],1  ;; 1'1 -> 1, 0'1 -> 0
+  jz   .Linchead
+  dec  byte [head]
+  jmp  .Lheadchged
+.Linchead
+  inc  byte [head]
+.Lheadchged:
+  jmp  ModStart2 ;; read track with other head sel.
+
+.Lcktrk:  ;; NOTE track limit as byte, i.e. floppy!
+  cmp  al,'t' ;; index to track (cylinder)
+  je   .Ldocyl
+  cmp  al,'T'
+  je   .Ldocyl
+  jmp  .LckCyl
+.Ldocyl:  ;; later do further user input for seek to.
+  ;; simple increment cylinder
+  mov  al,[track]
+  cmp  al,[maxtrack]  ;; limit is trk 79
+  jae   .Lrollover
+  inc  byte [track]
+  jmp  ModStart2      ;; reread with same hd, sect.#
+
+.Lrollover: ;;
+  mov  al,0
+  mov  [track],al
+  jmp  ModStart2      ;; reread with same hd, sect.#
+
+;; .if. 'C' or 'c' 'collect userinput of cylinder.
+.LckCyl:
+  cmp  al,'c'
+  je   .LdoMyCyl
+  cmp  al,'C'
+  je   .LdoMyCyl
+  jmp  .Lcksect
+.LdoMyCyl:  ;; allow user to give cylinder number.
+  ;; move cursor to cyl_hi, getbyte
+  mov  bx,[word VidCol]
+  push bx
+  mov  [VidCol],word 100Dh  ;; location Cyl display
+  call SetPgCurs
+  call GetHexDigit   ;; AH.hexval AL.upprcaseAscii
+  jc   .Lerrcyl
+  mov  [usrdigit],ah ;; hi nibble
+  call putc          ;; AL -> cursor, moves cursor
+  call GetHexDigit   ;; grab lower nibble
+  jc   .Lerrcyl
+  ;; .else. aok
+  call putc
+  ;; form cylinder number from nibbles, ah'low_nibble
+  mov  al,[usrdigit] ;; holds hi nibble
+  shl  al,4          ;; mov to hi place
+  add  al,ah         ;; make byte, ck limit
+  cmp  al,[maxtrack]
+  ja   .Lerrcyl      ;; bad val, don't chg cyl
+  ;; .else seek cyl
+  mov  [track],al    ;; ok so reread
+  pop  bx
+  mov  [VidCol],bx   ;; restores col&row 
+  jmp  ModStart2     ;; reread new cyl
+;;- - - - - - - - - - - - - - - - - - - - - - - - - -55
+.Lerrcyl:
+  pop  bx
+  mov  [VidCol],bx   ;; restores col&row
+  jmp  ShoHlfSect
+
+;;- - - - - - - - - - - - - - - - - - - - - - - - - -55
+;; .if. 'S' or 's' 'collect userinput of sector.
+.Lcksect:
+  cmp  al,'s' ;; index to sector
+  je   LdoMySect
+  cmp  al,'S'
+  je   LdoMySect
+  jmp  LCont   ;;jmp  Lckmode  ;; not s,S input
+;;- - - - - - - - - - - - - - - - - - - - - - - - - -55
+LdoMySect:  ;; allow user to seek to sector number.
+;; mov cursor to Sect_hi, getbyte.
+  mov  bx,[word VidCol]
+  push bx
+  mov  [VidCol],word 1019h  ;; location Sect. disp.
+  call SetPgCurs
+  call GetHexDigit   ;; AH.hexval AL.upprcaseAscii
+  jc   Lerrsect
+  mov  [usrdigit],ah ;; hi nibble
+  call putc          ;; AL -> cursor, moves cursor
+  call GetHexDigit   ;; grab lower nibble
+  jc   Lerrsect
+  ;; .else. aok
+  call putc
+;; form sector number from nibbles, ah'low_nibble
+  mov  al,[usrdigit] ;; holds hi nibble
+  shl  al,4          ;; mov to hi place
+  add  al,ah         ;; make byte, ck limit
+  cmp  al,[maxsects]
+  ja   Lerrsect      ;; bad val, ignore, refresh.
+  cmp  al,0          ;; Sector 0 is an error. 1..lim
+  je   Lerrsect
+;; .else. seek_sector in track already in buffer.
+  ;; convert sector numb to disp_rec_index.
+  dec  al     ;; ndx = (n-1)*2
+  shl  al,1
+  mov  [disp_rec_index],al
+  pop  bx
+  jmp  ShoHlfSect
+Lerrsect:
+  pop  bx
+  mov  [VidCol],bx   ;; restore col&row
+  jmp  ModStart
+
+
+;;- - - - - - - - - - - - - - - - - - - - - - - - - -55
+;;-= Other untrapped input =-
+
+;;- - - - - - - - - - - - - - - - - - - - - - - - - -55
+;;-= loop until exit =-
+LCont:
+  jmp  ShoHlfSect
+;; 
+  RET  ;; trap [shouldn't execute.]
+
+  [SECTION .dseg]
+;; Particular to 3 1/2 1.44 mb floppy media.
+maxheads db 1  ;; 0..1   2hds  'floppy
+maxsects db 18 ;; 1..18  18spt '1.44 mb 3 1/2in
+maxtrack db 79 ;; 0..79  80trks
+usrdigit db 0  ;; store intermediates.
+
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;; --- R E A D   E R R O R --------------------------55
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+  [SECTION .cseg]
+Read_Error:  ;; could not clear problem with recal.
+  mov  ax,[S_MsgLen]  ;; in diskio.mod
+  mov  [VidMLen],ax
+  mov  ax,[pStatMsg]  ;; in diskio.mod
+  mov  [VidMPtr],ax
+  mov  [VidCol],byte 39
+  mov  [VidRow],byte 16
+  mov  [Vid_Pg],byte 0
+  call WriteString
+  RET
+
+Clear_Err:
+  mov  [VidCol],byte 39
+  mov  [VidRow],byte 16
+  mov  [Vid_Pg],byte 0
+  call SetPgCurs   ;; setup curs pos
+
+  mov  cx, 35      ;; filler count->cx
+  mov  bl,[FAttr]  ;; filler attr in FILLSCR.MOD
+  mov  bh,[Vid_Pg]    ;; see Vid_Serv.Mod
+  mov  al,[BkgrdChar] ;; attr in FILLSCR.MOD
+  mov  ah,09h  ;; Wr chr, attr, to current cursor pos.
+  INT  10h
+  
+  RET
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;; --- M O D   I N I T  -----------------------------55
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+  [SECTION .cseg]
+ModInit:
+  mov  dx,FS
+  mov  [myFS],dx ;; Init DTA Segment.
+  call VidInit   ;; get&save initial/current Vid State.
+
+ ;; Fill Sreen Background.
+  mov  [FAttr],byte 1Fh ;;wht on blu
+  call Fill_Scr
+
+ ;; Print Command Legend.
+  call CmdsLegend
+
+ ;; SetPgCurs location.
+  mov  [VidCol],byte 0
+  mov  [VidRow],byte 16
+  mov  [Vid_Pg],byte 0
+  call SetPgCurs
+  RET
+  [SECTION .dseg]
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;;---------------------------------------------------55
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;;  [SECTION .cseg]
+;;ModStat: ;; [CODE BODY] 
+;;  [SECTION .dseg]
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;; S U B R O U T I N E   M O D U L E S
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+%INCLUDE "DISKIO.MOD"
+%INCLUDE "VID_SERV.MOD"
+%INCLUDE "WRT_STR.MOD"
+%INCLUDE "SHOW_DTA.MOD"
+%INCLUDE "POKESTR.MOD"
+%INCLUDE "FILL_SCR.MOD"
+%INCLUDE "INBUFFER.MOD"
+%INCLUDE "PRT_CMDS.MOD"
+;;---------------------------------------------------55
+;;   Stack Section
+;;---------------------------------------------------55
+;; -== S T A C K ==-
+  [SECTION .sseg vstart=0 align=16]
+stackbase:
+TIMES 80h db 0CCh
+stacktop:
+;;----EO SSeg--------
+
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;; S E C T I O N   T A I L S
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;;===================================================55
+;;    S E C T I O N   C L E A N U P
+;;===================================================55
+  [SECTION .cseg]
+    align 16, db 90h
+  [SECTION .dseg]
+    align 16, db 20h
+  [SECTION .eseg]
+    align 16, db 20h
+  [SECTION .fseg]
+    align 16, db 20h
+  [SECTION .gseg]
+    align 16, db 20h
+;;---------------------------------------------------55
+;;  EO FLOP_SEE.NSM
+;;---------------------------------------------------55
+</CODE></PRE>
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

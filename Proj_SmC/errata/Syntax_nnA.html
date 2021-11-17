@@ -1,0 +1,379 @@
+<PRE><CODE>
+/** Syntax_nnA.txt, syntax testing examples            **/
+/** Last: 4:07 PM 8/24/2008  By: s_dubrovich@yahoo.com **/
+/** Init: 8:34 AM 8/24/2008  Note: files combined      **/
+==========================================================
+ N O T E : Discussion follows...
+==========================================================
+
+/** synt001.c - syntax test 00A **/
+
+x = f() + g();
+
+----------------------------------------------------------
+
+;Small-c Compiler rev 1.1 re:NASM c0.1.5 Aug 2008
+	[MAP ALL SCCN.MAP]
+	SECTION .text vstart=0100h
+
+;/** synt001.c - syntax test 00A **/ 
+; 
+;x = f() + g();                                                                 
+;x = f() + g(); 
+;  ^
+;******  missing open paren  ******
+x:
+;x = f() + g(); 
+;  ^
+;******  illegal argument name  ******
+;x = f() + g(); 
+;    ^
+;******  expected comma  ******
+;x = f() + g(); 
+;     ^
+;******  expected comma  ******
+;x = f() + g(); 
+;     ^
+;******  illegal argument name  ******
+;x = f() + g(); 
+;          ^
+;******  expected comma  ******
+;x = f() + g(); 
+;           ^
+;******  expected comma  ******
+;x = f() + g(); 
+;           ^
+;******  illegal argument name  ******
+;        
+;
+;^
+;******  expected comma  ******
+;
+;^
+;******  wrong number args  ******
+	RET
+	;-; SECTION .dseg align=16 ;; commented out for .com version
+
+;10 errors in compilation.
+;	-= END =-
+----------------------------------------------------------
+Notes: statements outside of a block '{..}', are expected
+to be declarations, or function definitions, etc.  These
+are being looked at by the parse() function.
+
+/* At this level, only static declarations, */
+/*	defines, includes, and function */
+/*	definitions are legal...	*/
+parse()
+... 
+
+Next, let's reform our statement by putting it inside the
+main() {..} block... (although any named function block
+will do.)
+==========================================================
+/** synt002.c - syntax test 00A **/
+
+main()
+{
+	x = f() + g();
+}
+----------------------------------------------------------
+;Small-c Compiler rev 1.1 re:NASM c0.1.5 Aug 2008
+	[MAP ALL SCCN.MAP]
+	SECTION .text vstart=0100h
+
+;/** synt002.c - syntax test 00A **/ 
+; 
+;main() 
+main:
+;{ 
+;	x = f() + g(); 
+	MOV  AX,x
+; x = f() + g(); 
+;    ^
+;******  must be lvalue  ******
+; x = f() + g(); 
+;     ^
+;******  missing semicolon  ******
+	CALL f
+	PUSH AX
+	CALL g
+	POP  BX
+	ADD  AX,BX
+;} 
+	RET
+;                                                         
+	;-; SECTION .dseg align=16 ;; commented out for .com version
+
+;2 errors in compilation.
+;	-= END =-
+
+----------------------------------------------------------
+Notes: Here, x is undefined yet, as it is not seen as an
+lvalue. Historically, lvalue and rvalue take their cue
+from their position in an assignment statement:
+lvalue := rvalue; .such that. (for C Syntax),
+     a = b; .where. the value held in the location ident-
+ified by variable 'b' is copied to the location identified
+by variable 'a'.
+.thus. a variable can be said to possess the three attri-
+butes of; a lexeme 'b', a location, and a value.  In
+contrast, a constant has only two attributes; a lexeme '3'
+and a value, but no location.  .thus. an assignment to a
+constant is an error state.  Because of this, I think of
+lvalue in terms of being the 'location value' of a variable,
+and a rvalue in terms of being the 'referenced value' held
+in a variable's lvalue.
+
+Next, let's define 'x' statically, outside a block...
+==========================================================
+/** synt003.c - syntax test 00A **/
+
+int x;
+
+main()
+{
+	x = f() + g();
+}
+----------------------------------------------------------
+;Small-c Compiler rev 1.1 re:NASM c0.1.5 Aug 2008
+	[MAP ALL SCCN.MAP]
+	SECTION .text vstart=0100h
+
+;/** synt003.c - syntax test 00A **/ 
+; 
+;int x; 
+; 
+;main() 
+main:
+;{ 
+;	x = f() + g(); 
+	CALL f
+	PUSH AX
+	CALL g
+	POP  BX
+	ADD  AX,BX
+	MOV  [x	],AX
+;} 
+	RET
+;                                               
+	;-; SECTION .dseg align=16 ;; commented out for .com version
+x:	TIMES 1	DW 	0
+
+;0 errors in compilation.
+;	-= END =-
+
+----------------------------------------------------------
+Notes: Notice that, even though the functions haven't 
+been defined as returning anything, (as of now, they
+haven't a function definition), it is taken as a 
+default that a value is returned in the Primary Register,
+AX.  Hence, the assembler output structure makes sense,
+but the program logic is still unformed.  Note that there
+are no syntax errors found.
+Small-C sees a named function as a call to that function.
+At this point, f(), and g(), are left to NASM to resolve, 
+they could be in another file to be included.
+
+Next, let's give the named functions their definition...
+==========================================================
+/** synt004.c - syntax test 00A **/
+
+int x;
+
+main()
+{
+	x = f() + g();
+}
+
+f()
+{
+	return 1;
+}
+
+g()
+{
+	return 2;
+}
+/** eof **/
+----------------------------------------------------------
+;Small-c Compiler rev 1.1 re:NASM c0.1.5 Aug 2008
+	[MAP ALL SCCN.MAP]
+	SECTION .text vstart=0100h
+
+;/** synt004.c - syntax test 00A **/ 
+; 
+;int x; 
+; 
+;main() 
+main:
+;{ 
+;	x = f() + g(); 
+	CALL f
+	PUSH AX
+	CALL g
+	POP  BX
+	ADD  AX,BX
+	MOV  [x	],AX
+;} 
+	RET
+; 
+;f() 
+f:
+;{ 
+;	return 1; 
+	MOV  AX,1
+	RET
+;} 
+; 
+;g() 
+g:
+;{ 
+;	return 2; 
+	MOV  AX,2
+	RET
+;} 
+;/** eof **/                                                                    
+;                                             
+	;-; SECTION .dseg align=16 ;; commented out for .com version
+x:	TIMES 1	DW 	0
+
+;0 errors in compilation.
+;	-= END =-
+
+----------------------------------------------------------
+Notes:  Here we have more confidence in the program, that
+the logic is well formed in this unit.  So we see, as far
+as Small-C is concerned, f() and g() could just as well
+be external to this file without a problem.
+
+Next, let's move 'x' from being static storage class to
+being auto storage class (local to main)...
+==========================================================
+/** synt005.c - syntax test 00A **/
+
+
+
+main()
+{
+	int x;
+
+	x = f() + g();
+}
+
+f()
+{
+	return 1;
+}
+
+g()
+{
+	return 2;
+}
+/** eof **/
+----------------------------------------------------------
+;Small-c Compiler rev 1.1 re:NASM c0.1.5 Aug 2008
+	[MAP ALL SCCN.MAP]
+	SECTION .text vstart=0100h
+
+;/** synt005.c - syntax test 00A **/ 
+; 
+; 
+; 
+;main() 
+main:
+;{ 
+;	int x; 
+	PUSH AX
+; 
+;	x = f() + g(); 
+	MOV  AX,0
+	ADD  AX,SP
+	PUSH AX
+	CALL f
+	PUSH AX
+	CALL g
+	POP  BX
+	ADD  AX,BX
+	POP  BX
+	MOV  [BX],AX
+;} 
+	ADD  SP,2
+	RET
+; 
+;f() 
+f:
+;{ 
+;	return 1; 
+	MOV  AX,1
+	RET
+;} 
+; 
+;g() 
+g:
+;{ 
+;	return 2; 
+	MOV  AX,2
+	RET
+;} 
+;/** eof **/                                                                    
+;                                        
+	;-; SECTION .dseg align=16 ;; commented out for .com version
+
+;0 errors in compilation.
+;	-= END =-
+
+----------------------------------------------------------
+Notes:  Here we see how auto variables are handled by 
+Small-C, they are stack variables local to the current
+activation record...
+
+It may be somewhat confusing how Small-C handles these.
+The methods stem from life on an 8080 cpu which hasn't any
+segment registers and code, data, and stack share a common
+address space.  Where the x86 cpu's have SP and BP, the
+8080 had only SP, so activation frames took a different
+form.  The Small-c method is upward compatible, but
+inelegant, so this is an area to be addressed now that
+Small-C compiles itself into NASM assembler.
+
+First, as an auto is parsed, space on the stack is created
+for it by PUSH Primary, irregardless of the value held in
+the Primary, its purpose is to decrement the SP by sizeof
+INT.
+
+Secondly, when the auto is parsed, a local symbol table
+entry is created for it by the compiler and it's relative
+location in relation to the SP is recorded, this value is
+an ordinal, an index by sizeof type, indicating its relative
+position in the list of auto's parsed for this frame.  This
+value and SP form the offset address of the autos' location,
+and a pointer to the auto is formed and pushed secondly onto
+the stack.  Thus for the one auto 'x' above;
+
+PUSH AX => creates space for 'x' as declared..
+.
+MOV  AX,0
+ADD  AX,SP => forms a pointer to 'x' (local, on the stack).
+PUSH AX    => Secondly, saves pointer to 'x' to use in
+further reference to 'x' in..
+POP  BX
+MOV  [BX],AX .. as in assigning a result to 'x'.
+
+Because of the auto nature of 'x', it is lost when the
+function returns.
+
+The value held in 'x' can be returned in the Primary Reg.
+through the C statement; return x;. -But is already in AX
+in our simple function as a side effect of being the only
+auto object operated on.
+
+==========================================================
+-= eof =-
+==========================================================
+</CODE></PRE>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

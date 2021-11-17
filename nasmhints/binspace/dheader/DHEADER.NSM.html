@@ -1,0 +1,251 @@
+<html>
+<code>
+<pre>
+;;PAGEWIDTH 80
+;;TITLE 'MODULE HEADER STUB'
+[MAP ALL DHEADER.MAP]
+;;---------------------------------------------------55
+;; Module Name: dheader .nsm By: s_dubrovich@yahoo.com
+;; Last Update: 09 MAR 2008  Init: 08 JUN 2007
+;; Vers: 0.1.6  Goal: Clean pcDOS type stub. 
+;; Desc:
+;;  Demo multi-section program under pcDos or Command
+;;  Prompt of win95,98,XP.
+;; EndDesc:
+;;---------------------------------------------------55
+;; 09-Mar-08 01:49:35 PM.
+;;---------------------------------------------------55
+;; nasm -=pcDos=-
+;; -f bin -l dheader.lst -o dheader.com dheader.nsm
+;;---------------------------------------------------55
+;; revs dates for TEMPLATE
+;; 08 MAR 2008 - Deprecated for pcDos .com's
+;;---------------------------------------------------55
+;;---------------------------------------------------55
+;;  Code Start
+;;---------------------------------------------------55 
+;;---- initial cseg declaration ----
+  [BITS 16]
+;; Nasm conditionals test for Z,NZ where (%IF Expr)
+;;  succeeds if Val of Expr is non-zero.
+TRUE     equ 1
+FALSE    equ TRUE-TRUE  
+
+FSGS     equ TRUE  ;; use FSeg and GSeg Segments.
+pcDos    equ TRUE  ;;Make as .com
+;;---------------------------------------------------55
+  SECTION .cseg vstart=0 align=16
+mod_cstart:
+;;---------------------------------------------------55
+;;- setup runtime segment registers from current CS -
+;; Note: this assumes real mode contiguous binary.
+
+  mov  bx,CS
+  add  bx,codemin  ;;segm_sz of code + CS = DSEG
+%IF pcDos
+  add  bx,10h      ;; adj for 0100h orging
+%ENDIF
+  mov  DS,bx
+  add  bx,datamin  ;; + segm_sz data = ESEG
+  mov  ES,bx
+  add  bx,extramin ;; + segm_sz extra = nxtSEG
+;;== CS,DS,ES Set. ==
+;;== Set FS,GS ==
+%IF FSGS  ;; use FS,GS Segments ?nested IFs?-Allowed.
+  mov  FS,bx
+  add  bx,fsegmin ;; + segm_sz fseg = GSEG
+  mov  GS,bx
+  add  bx,gsegmin ;; + segm_sz gseg = SSEG
+%ENDIF
+;;== Set SS Last ====
+  mov  SS,bx       ;;Put off Stack until after Data.
+  mov  sp,stack_sp ;;offset in SSEG
+  mov  bp,sp       ;; start with a known value...
+  sub  bp,2
+  push bp          ;;now bp==[sp]==sp and this
+          ;;represents a known start state where
+          ;; this is the root of a possible chain
+          ;; of stack frames with bp as a link to
+          ;; a previous stack frame, or itself [head].
+;;===================================================55
+;;    M A I N
+;;===================================================55
+main:
+;;  call ModInit
+  call ModStart
+;;  call ModStat
+;;---------------------------------------------------55
+;;---exit program---
+alldone:  ;;return to here, exit.
+;; do dos exit in this version...
+
+%IF pcDos
+  mov ax,4C00h
+  int 21h
+%ELSE         ;; binary exit thru RomBios.
+  mov  ah,0
+  int  16h    ;; pause until keypress.
+  int  19h    ;; reboot.
+%ENDIF
+
+;;---------------------------------------------------55
+;;  Data Start
+;;---------------------------------------------------55
+  SECTION .dseg vstart=0 align=16
+
+mod_dstart:
+
+by_whom:  db 's_dubrovich@yahoo.com'
+date_mod: db ' 08 MAR 2008 '
+vers:     db '0.0.2 beta '
+notice:   db 0Dh,0Ah,09h,'-= DS: Your Message Here =-'
+          db 0Dh,0Ah,'$',0
+  align 16, db 20h
+
+;;----EO DSeg--------
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;;---------------------------------------------------55
+;; Module Execution
+;;---------------------------------------------------55
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+  [SECTION .cseg]
+ModStart: ;; [CODE BODY]
+  mov  ah,9
+  mov  dx,notice ;; DS is set already.
+  int  21h 
+
+  push DS
+  push ES
+  pop  DS
+  mov  ah,9
+  mov  dx,eshello ;; string in .eseg
+  int  21h
+  
+  push FS
+  pop  DS
+  mov  ah,9
+  mov  dx,fshello ;; string in .fseg
+  int  21h 
+
+  push GS
+  pop  DS
+  mov  ah,9
+  mov  dx,gshello ;; string on .gseg
+  int  21h
+  pop  DS  ;; restore DS, square stack. 
+
+  mov  ah,0 ;; pause to view.
+  int  16h
+  RET
+;;  [SECTION .dseg]
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;;---------------------------------------------------55
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;;  [SECTION .cseg]
+;;ModInit: ;; [CODE BODY] 
+;;  [SECTION .dseg]
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;;---------------------------------------------------55
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;;  [SECTION .cseg]
+;;ModStat: ;; [CODE BODY] 
+;;  [SECTION .dseg]
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;;---------------------------------------------------55
+;;  End Code Segment
+;;---------------------------------------------------55
+  [SECTION .cseg]
+  align 16, db 0CCh
+mod_cend:
+codelen equ (mod_cend - mod_cstart)
+codemin equ codelen >> 4
+;;----EO CSeg--------
+
+;;---------------------------------------------------55
+;;  Data Ends
+;;---------------------------------------------------55
+  [SECTION .dseg] ;; consult MAP to locate data in .bin
+align 16,db 0F6h
+mod_dend:
+datalen equ (mod_dend - mod_dstart)
+datamin equ datalen  >> 4
+;;----EO DSeg--------
+
+;;---------------------------------------------------55
+;;  Extra Start - Add'l Data Section.
+;;---------------------------------------------------55
+  SECTION .eseg vstart=0 align=16
+mod_estart:
+eshello: db 09h
+  db '-=*** From ES: Hello! ***=-',0Dh, 0Ah,'$',0
+;;---------------------------------------------------55
+;;  Extra Ends
+;;---------------------------------------------------55
+  align 16, db 0FFh
+mod_eend:
+extralen equ (mod_eend - mod_estart)
+extramin equ extralen >> 4
+;;--- EO ESeg ---
+;;=========
+%IF FSGS  ;; use FS,GS Segments
+;;---------------------------------------------------55
+;;  FSeg Start - Add'l Data Section.
+;;---------------------------------------------------55
+  SECTION .fseg vstart=0 align=16
+mod_fstart: 
+fshello: db 09h
+  db '-=*** From FS: Hello! ***=-',0Dh, 0Ah,'$',0
+;;---------------------------------------------------55
+;;  FSeg Ends
+;;---------------------------------------------------55
+  align 16, db 0FFh
+mod_fend:
+fseglen equ (mod_fend - mod_fstart)
+fsegmin equ fseglen >> 4
+;;--- EO FSeg ---
+
+;;---------------------------------------------------55
+;;  GSeg Start - Add'l Data Section.
+;;---------------------------------------------------55
+  SECTION .gseg vstart=0 align=16
+mod_gstart:
+gshello: db 09h
+  db '-=*** From GS: Hello! ***=-',0Dh, 0Ah
+notify:  db 09h,'     [anykey] to exit!',08,'$'
+;;---------------------------------------------------55
+;;  GSeg Ends
+;;---------------------------------------------------55
+  align 16, db 0FFh
+mod_gend:
+gseglen equ (mod_gend - mod_gstart)
+gsegmin equ gseglen >> 4
+;;--- EO GSeg ---
+%ENDIF ;;FSGS
+;;==========
+
+;;---------------------------------------------------55
+;;   Stack Start
+;;---------------------------------------------------55
+SECTION .sseg vstart=0 align=16
+mod_sstart:
+  TIMES (8*512) db 0CCh
+;;---------------------------------------------------55
+;;   Stack Ends
+;;---------------------------------------------------55
+  align 16, db 0CCh
+mod_send:
+stack_sp equ (mod_send - mod_sstart)
+stacklen equ (mod_send - mod_sstart)
+stackmin equ stacklen >> 4
+;;----EO SSeg--------
+;;---------------------------------------------------55
+;;  EO DHEADER.NSM
+;;---------------------------------------------------55
+</pre>
+</code>
+</html>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

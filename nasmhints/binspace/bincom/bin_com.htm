@@ -1,0 +1,96 @@
+<html>
+<span style='font-family:"Courier New";mso-bidi-font-family:Arial'>
+<b><i>-borrowed from the NASM Documentation...</i></b>
+<pre>
+--------------------------------------------------------------------------------
+
+7.2 Producing .COM Files
+
+--------------------------------------------------------------------------------
+
+While large DOS programs must be written as .EXE files, small ones are often 
+better written as .COM files. .COM files are pure binary, and therefore most
+easily produced using the bin output format.
+
+<b><i>
+..I don't know if 'large DOS programs must be written as .EXE files', someday
+perhaps I'll try to verify that.  There's some text that says .com is restricted
+to 64k for code, data, and stack, but I doubt that too.  But .com is not my main
+focus, multisection code, data, and stack is.  DOS is sometimes a convenient 
+test bed, and there we can manage our own segment registers just fine. 
+
+-= Jun 2009 =-
+CMD.EXE does report 'out of memory' on trying to load a .COM > 64k.  It will
+accept the same if made as an .EXE file however.
+</i></b>
+
+--------------------------------------------------------------------------------
+
+7.2.1 Using the bin Format To Generate .COM Files
+
+--------------------------------------------------------------------------------
+
+.COM files expect to be loaded at offset 100h into their segment (though the
+segment may change). Execution then begins at 100h, i.e. right at the start of
+the program. So to write a .COM program, you would create a source file looking
+like:
+
+        org 100h 
+
+section .text 
+
+start: 
+        ; put your code here 
+
+section .data 
+
+        ; put data items here 
+
+section .bss 
+
+        ; put uninitialised data here
+
+The bin format puts the .text section first in the file, so you can declare data
+or BSS items before beginning to write code if you want to and the code will
+still end up at the front of the file where it belongs.
+
+The BSS (uninitialised data) section does not take up space in the .COM file
+itself: instead, addresses of BSS items are resolved to point at space beyond
+the end of the file, on the grounds that this will be free memory when the
+program is run. Therefore you should not rely on your BSS being initialised to
+all zeros when you run.
+
+To assemble the above program, you should use a command line like
+
+nasm myprog.asm -fbin -o myprog.com
+
+The bin format would produce a file called myprog if no explicit output file
+name were specified, so you have to override it and give the desired file name.
+
+--------------------------------------------------------------------------------
+
+<b><i>Notes- Indeed NASM tries to put .text first in the file, to the point that
+if you try to rearrange it with vfollows=.data NASM will put .data first in the
+output followed by .text even though .data is last in sequence in the file.  The
+.bss, actually all nobits sections, are sequenced last in the file, regardless.
+
+The nobits sections present certain considerations.  How they are handled is
+dependent on some sort of Loader scheme, what should happen is that the space
+they describe should be appended to the rest of the memory image, where ever it
+resides.  That space must not be written over by subsequent loading of code.  In
+the case of loading binary code without a formal Loader which is aware of the 
+code contruction strategy employed, some way of imparting that sort of
+information about program structure and nobits sections is required.  </i></b>
+
+--------------------------------------------------------------------------------
+
+<p><i style='mso-bidi-font-style:normal'><span style='font-size:10.0pt;
+font-family:"Courier New";mso-bidi-font-family:Arial'><a
+href="../../../index.htm">BACK to main page</a><o:p></o:p></span></i></p>
+
+</pre>
+</html>
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

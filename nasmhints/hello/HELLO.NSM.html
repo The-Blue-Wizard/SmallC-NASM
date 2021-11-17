@@ -1,0 +1,104 @@
+<html>
+<code>
+<pre>
+;;PAGEWIDTH 80
+;;TITLE 'LAME HELLO MODULE'
+[MAP ALL HELLO.MAP]
+;;---------------------------------------------------55
+;; Module Name: hello   .nsm By: s_dubrovich@yahoo.com
+;; Last Update: 09 FEB 2008  Init: 09 FEB 2008
+;; Vers: 0.0.1  Goal: Write Str, hello world. 
+;;---------------------------------------------------55
+;; -= nasm =-
+;; -f bin -l hello.lst -o hello.com hello.nsm
+;;---------------------------------------------------55
+[bits 16]
+ org 0100h  ;; to run as a .com executable
+SECTION .code 
+  mov  si,Message
+;******************************************************
+; PROCEDURE DisplayMessage
+; display ASCIIZ string at ds:si via BIOS
+;******************************************************
+;; routine borrowed from the bootsector example.
+
+DisplayMessage:
+  lodsb                  ; load next character
+  or   al,al             ; test for NUL character
+  jz   .DONE
+  mov  ah,0x0E           ; BIOS teletype
+  mov  bh,0x00           ; display page 0
+  mov  bl,0x07           ; text attribute
+  int  0x10              ; invoke BIOS
+  jmp  DisplayMessage
+.DONE:
+  mov  ah,0
+  int  16h    ;;pause until keypress.
+  int  19h    ;;reboot.
+
+;;---------------------------------------------------55
+SECTION .data
+Message db 'Hello World! -press a key to exit.',0
+;;---------------------------------------------------55
+;;  --EO HELLO MODULE--
+;;---------------------------------------------------55
+;; Notes: hello.com runs as HELLO.COM under the various
+;; Windows, XP OSes.  CMD.EXE is the DPMI v0.9 host
+;; which loads and runs these, usually automatically
+;; by just clicking on the file, such as HELLO.COM,
+;; however you can adjust aspects of this process by
+;; creating a 'shortcut' to such an executable by
+;; 'right clicking' on it.  Doing that brings up a 
+;; menu which has the selection to 'Create Shortcut'.
+;; Selecting that creates a control file: 'Shortcut to
+;; HELLO.COM'.  Again, but this time by 'right clicking'
+;; the short cut itself, brings up another menu with a
+;; 'Properties' selection.  Selecting 'Properties' will
+;; give a dialog box allowing access to the default
+;; aspects of how the DPMI host will treat the
+;; executable.  There are numerous aspects, but of note
+;; to us is the 'Program' tab.  Selecting that gives
+;; access to 2 noteworthy things, A) there is a check-
+;; box for 'Close on Exit', normally we want that
+;; unchecked so we can see output from HELLO.COM, or
+;; any other executable before the final exit.  Above,
+;; the code at .DONE stalls until a keypress, for that
+;; reason, because the default property is to 'Close
+;; on Exit'.  B) There is a dialog box titled 'Cmd
+;; line:' which has the 'path' to our target HELLO.COM.
+;; There is a convenient option which can be indicated
+;; by appending a space and the question mark
+;; character: '?'.  This option is not used for 
+;; HELLO.COM, which doesn't accept user runtime
+;; options.  But it is quite useful for running the
+;; NASM compiler.  The ? opens up a runtime 
+;; dialog box so the user can specify command line 
+;; parameters for the executable, such as NASM, 
+;; directly when the executable begins.  Don't forget
+;; to save any changes made by clicking the 'Apply'
+;; button.  For running NASM then to assemble
+;; HELLO.NSM, we can cut and paste the above-
+;; -f bin -l hello.lst -o hello.com hello.nsm
+;; into the command line dialog popup when we double
+;; click the 'Shortcut to NASM.EXE'.
+;; Another word about shortcuts.  They are control
+;; files.  They can be copied to other locations, but
+;; this is a bad practice because the Paths will end
+;; up pointing to unexpected or non-existing
+;; locations.
+;; You may get the error shown in the screenshot, i.e.
+;; "Bad command or file name" but this doesn't affect
+;; the nasm assembly, as the directory listing shows
+;; the resulting files.  On my system this error was 
+;; cured by commenting out fcbs=20 -> REM fcbs=20 in
+;; AUTOEXEC.NT, the CONFIG.NT is set to: fcbs=8,
+;; files=40 in the C:\WINDOWS\system32 directory.
+;; -= eof =-
+</pre>
+</code>
+</html>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

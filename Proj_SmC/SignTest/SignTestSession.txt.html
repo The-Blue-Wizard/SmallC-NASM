@@ -1,0 +1,55 @@
+<html>
+<I><P>
+The SIGNTEST compiling session...
+</P></I>
+<code>
+<pre>
+     * * *  small-c compiler  * * *
+
+              by Ron Cain
+
+* NASM Vers c0.1.5, Aug. 2008, s_dubrovich@yahoo.com *
+
+Do you want the c-text to appear? (y) y
+Do you wish the globals to be defined? (y) y
+Starting number for labels? (0) 0
+Output filename? signtest.nsm
+File Not Found for writing, Creating..
+ -File Created for Writing-
+CCB File Buffer assigned.
+fopen result reports not null.
+00003
+
+Input filename? signtest.c
+File Found and Opened for Reading.
+CCB File Buffer assigned.
+fopen result reports not null.
+00004
+
+File Found and Opened for Reading.
+CCB File Buffer assigned.
+fopen result reports not null.
+00005
+
+-= End of File Reached =-
+OS_fc result reports null, success.
+fclose result reports null, success.
+-= End of File Reached =-
+OS_fc result reports null, success.
+fclose result reports null, success.
+Input filename?
+</pre>
+</code>
+<I><P>
+Small-C takes a blank line response to exit, so press [Enter] or [Return] now in response its query for another source file, and compiling will begin.  The VERBOSE is set to on in the Library as a debugging aid.  You'll notice above that one file was created, the output file, and two more files were opened for reading, the C source file, and the Library File.  Cain designed the input this way so that incremental building could be done from the command line, so that the compiler could be fed a series of files.  #include filename, works as well.
+</P></I>
+<P>
+<H5>
+9:25 AM 8/17/2008
+</H5>
+</p>
+</html>
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

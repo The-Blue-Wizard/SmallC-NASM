@@ -1,0 +1,68 @@
+<PRE><CODE>
+;;PAGEWIDTH 80
+;;TITLE 'FILL SCREEN MODULE'
+;;---------------------------------------------------55
+;; Module Name: fill_scr.mod By: s_dubrovich@yahoo.com
+;; Last Update: 16 DEC 2007  Init: 23 NOV 2007
+;; Vers: 0.1.4  Goal: Clear Screen w/ background.
+;; Desc:
+;; Module to clear screen with background.
+;;  Int 10h, AH.0Ah
+;; EndDesc:
+;;
+;; SubrLst:     //Code Labels meant for Global Use.
+;; Fill_Scr:
+;; EndSubrLst:
+;;
+;; ExternLst:   //Code Labels refer to another module.
+;; SetPgCurs:   // in VID_SERV
+;; EndExternLst:
+;;
+;; GlobalLst:   //Our Data Labels meant for Global Use.
+;; EndGlobalLst:
+;;
+;; ExternDataLst:  //Data Labels in Another Module.
+;; VidCol:  // in VID_SERV
+;; VidRow:  // in VID_SERV
+;; Vid_Pg:  // in VID_SERV
+;; EndExternDataLst:
+;;
+;; ReqdFNL:     //List Function Modules we Require
+;; VID_SERV.MOD // Parent.
+;; EndReqd FNL:
+;;---------------------------------------------------55
+;; 24-Nov-07 09:57:07 PM
+;;---------------------------------------------------55
+;; STATUS .. fix prnt loc to 0,0 ok?
+;;---------------------------------------------------55
+  [SECTION .cseg]
+Fill_Scr:
+  mov  [VidCol],byte 0
+  mov  [VidRow],byte 0
+  mov  [Vid_Pg],byte 0
+  call SetPgCurs   ;; setup curs pos
+
+  mov  ah,[VidRowMax]
+  inc  ah
+  mov  al,[VidColMax]
+  inc  al
+  mul  ah
+  mov  cx,ax          ;; filler count->cx
+  mov  bl,[FAttr]
+  mov  bh,[Vid_Pg]    ;; see Vid_Serv.Mod
+  mov  al,[BkgrdChar]
+  mov  ah,09h
+  INT  10h
+  RET
+
+  [SECTION .dseg] ;; see Vid_Serv.Mod
+FAttr     db 6Fh  ;; Fill Attr: wht on brn
+BkgrdChar db 0B0h ;; blobs B0..B2, Solid 0DBh
+;;---------------------------------------------------55
+;;  --EO FILL_SCR SUBROUTINE MODULE--
+;;---------------------------------------------------55
+</CODE></PRE>
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

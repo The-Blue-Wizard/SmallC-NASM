@@ -1,0 +1,291 @@
+<PRE><CODE>
+;;PAGEWIDTH 80
+;;TITLE 'SHOW DTA MODULE'
+;;---------------------------------------------------55
+;; Module Name: show_dta.mod By: s_dubrovich@yahoo.com
+;; Last Update: 27 JAN 2008  Init: 19 JAN 2008
+;; Vers: 0.0.6r0  Goal: Display DTA 
+;; Desc:
+;;  Display diskette DTA from FS:0000h
+;;  -or- Display memory DTA
+;; EndDesc:
+;;
+;; SubrLst:     //Code Labels meant for Global Use.
+;;  Sho_DTA:
+;;  Byte2Ascii:
+;; EndSubrLst:
+;;
+;; ExternLst:   //Code Labels refer to another module.
+;;  PrntLocCalc:  //WRT_STR.MOD
+;;  PPrntLocCalc: //POKESTR.MOD
+;; EndExternLst:
+;;
+;; GlobalLst:   //Our Data Labels meant for Global Use.
+;;  [half_sector_index]'byte
+;;  [disp_rec_index]'word
+;;  [DTA_content_mode]'byte
+;; EndGlobalLst:
+;;
+;; ExternDataLst:  //Data Labels in Another Module.
+;;  [VidRow]   //VID_SERV.MOD
+;;  [VidCol]   //VID_SERV.MOD
+;;  [VidMPtr]  //VID_SERV.MOD
+;;  [VidMLen]  //VID_SERV.MOD
+;;  [head]     //DISKIO.MOD
+;; EndExternDataLst:
+;;
+;; ReqdFNL:     //List Function Libs. we Require
+;;  VID_SERV.MOD
+;;  DISKIO.MOD
+;; EndReqd FNL:
+;;---------------------------------------------------55
+;; 27-Jan-08 11:06:20 AM
+;;---------------------------------------------------55
+;; This expects the DTA to have fresh data.
+  [SECTION .cseg]
+Sho_DTA:  ;; show dump of 16 bytes by 16 lines
+  ;; init vid_serv values for wrt_str.
+  mov  [VidRow],byte 0
+  mov  [VidCol],byte 0
+  mov  [VidMPtr],word Laddr  ;; out str buffer.
+  mov  [VidMLen],word Llen-Laddr ;; str length
+;; display memory buffer dump.
+;; 16 bytes by 16 lines is half_sector_of_512_bytes.
+;;  [disp_rec_index] is half sector index [0..35] x
+;;  256 = offset into buffer of half_sector to display.
+
+dumpbuff:  ;; compose line & prt strLN, 16x.
+  ;; initialize before loops...
+  cld       ;; we want to increment thru trk buffer
+;; Calc sector number and poke into statln
+  call calc_sect
+;; Calc head number and poke into statln
+  call calc_hd
+;; Calc cylinder and poke into statln
+  call calc_cyl
+;;
+  mov  cx,0
+  mov  cl,[disp_rec_index] ;;get current pointer.
+  mov  [half_sector_index],cl  ;;stor work index.
+
+;;convert index number to buffer offset...
+  mov  ax,cx
+  mov  di,100h ;; 16 lines of 16 bytes = 100h
+  mul  di     ;;expecting word in AX, dword in DX:AX.
+;; expecting range of 0..2300 as an offset in AX.
+;-; expecting range of 0..FF00 as an offset in AX.
+  mov  si,ax  ;; offset is from FS:0 i.e. FS:SI
+  ;;outer loop for 16 lines.
+  mov  cx,16  ;; is line count
+
+doline:
+  push cx
+    ;; inner loop for 16 bytes to make hexln
+;; Do address field
+  call calc_addr ;; calc addr & poke ascii field.
+  call indx16ths ;;  calc addr 16ths & poke
+  mov  cx,16  ;; 16 bytes loop
+  mov  bx,0   ;; index
+
+loadbyt:       ;; LODSB takes from fs:si and inc's si
+  mov  dx,0
+  push cx
+
+  FS   lodsb  ;;Use FS:SI as Ptr
+  mov  [Lval+bx], al  ;; save byte in raw field.
+  add  dx,bx
+  add  dx,bx
+  add  dx,bx
+  xchg bx,dx
+    ;; convert byte to two ascii nibbles,
+  aam  16     ;; hi nib in ah, lo nib in al, in hex.
+  xchg al,ah  ;; swap nibbles for output order.
+  cmp  al,9
+  ja   alph   ;;.else. digit   
+  add  al,30h ;; make ascii number
+  jmp  put_nib
+alph:          ;; make ascii capital letter
+  add  al,37h 
+put_nib:
+  mov  [Lfld+bx],al
+nextnib:
+  xchg al,ah  ;; swap for output order.
+  cmp  al,9
+  ja   alph2   ;;.else. digit   
+  add  al,30h  ;; make ascii number
+  jmp  put_nib2
+alph2:         ;; make ascii capital letter
+  add  al,37h 
+put_nib2:
+  mov  [Lfld+bx+1],al
+next_sp:
+  mov  [Lfld+bx+2],byte 20h ;; redundant, clip later.
+  xchg bx,dx
+  inc  bx
+;; should be 3 char output including space.
+  pop  cx
+  loop loadbyt
+
+;; end inner, which is a Line, So Display it..
+  call PokeString  ;; params are preset.
+  inc  byte [VidRow]
+  mov  [VidCol],byte 0  ;; reset for next line.
+  inc  byte [val16ths]  ;; incr 16ths addr
+  
+  pop  cx
+  loop doline
+  ;; end outer -fall thru to DispSCH
+
+;;---------------------------------------------------55
+;; Display S,C,H.
+DispSCH:
+  mov  [VidMPtr],word Lstat  ;; out str buffer.
+  mov  [VidMLen],word lenLstat-Lstat ;; str length
+  call WriteString
+  call PPrntLocCalc  ;; Update Cursor to next prtpos.
+
+;; Display lo,or hi based on index even or odd.
+  test byte [disp_rec_index],1
+  jz   .Leven
+  mov  [VidMPtr],word Ldhi
+  mov  [VidMLen],word 5
+  jmp  .LCont
+.Leven
+  mov  [VidMPtr],word Ldlo
+  mov  [VidMLen],word 5
+.LCont
+  call WriteString
+  call PrntLocCalc  ;; update cursor to next position.
+;-; inc  byte [disp_rec_index] ;; inc by display length
+;-; Let user control indexing.
+  RET   ;; -= eo diplay half sector =-
+
+;;---------------------------------------------------55
+;; Poke Laddr: with ascii dbl word val.
+
+calc_addr:
+  mov  al,[disp_rec_index] ;; val x 100h = addr
+    ;; convert byte to two ascii nibbles,
+  aam  16     ;; hi nib in ah, lo nib in al, in hex.
+  cmp  al,9
+  ja   myalph   ;;.else. digit   
+  add  al,30h ;; make ascii number
+  jmp  put_indxlo
+myalph:          ;; make ascii capital letter
+  add  al,37h 
+put_indxlo:
+  mov  [indxlo],al
+  mov  [Laddr+6],al
+  mov  al,ah
+  cmp  al,9
+  ja   myalph2
+  add  al,30h
+  jmp  put_indxhi
+myalph2:
+  add  al,37h
+put_indxhi:
+  mov  [indxhi],al
+  mov  [Laddr+5],al
+  RET
+;;= = = = = = = = = =
+;; do 16ths nibble...
+indx16ths:
+  mov  al,[val16ths]
+  call Byte2Ascii
+  mov  al,[byteasciilo]
+  mov  [indxlolo],al
+  mov  [Laddr+7],al
+  RET
+;;---------------------------------------------------55
+;; Poke Lsect: with ascii val of sector number on trk.
+calc_sect:
+  mov  al,[disp_rec_index] ;; (val shr 1) + 1 = sect
+  shr  al,1
+  inc  al
+  call Byte2Ascii
+  mov  al,[byteasciilo]
+  mov  [Lsect+3],al
+  mov  al,[byteasciihi]
+  mov  [Lsect+2],al
+  RET
+;;---------------------------------------------------55
+;; Poke Lcyl: with ascii val of track (cylinder) sel.
+calc_cyl:
+  mov  al,[byte track]
+  call Byte2Ascii
+  mov  al,[byteasciilo]
+  mov  [Lcyl+3],al
+  mov  al,[byteasciihi]
+  mov  [Lcyl+2],al 
+  RET
+;;---------------------------------------------------55
+;; Poke Lhd: with ascii val of head selected.
+calc_hd:
+  mov  al,[byte head]
+  call Byte2Ascii
+  mov  al,[byteasciilo]
+  mov  [Lhd+3],al
+  mov  al,[byteasciihi]
+  mov  [Lhd+2],al 
+  RET
+
+;;---------------------------------------------------55
+;; Byte2Ascii: AL.byte_val -> [bytevalhi]'Ascii_Digit,
+;;                            [bytevallo]'Ascii_Digit.
+Byte2Ascii:
+  aam  16     ;; hi nib in ah, lo nib in al, in hex.
+  cmp  al,9
+  ja   myloalph   ;;.else. digit   
+  add  al,30h ;; make ascii number
+  jmp  put_asciilo
+myloalph:          ;; make ascii capital letter
+  add  al,37h 
+put_asciilo:
+  mov  [byteasciilo],al
+  mov  al,ah
+  cmp  al,9       ;; do high order nibble 
+  ja   myhialph
+  add  al,30h
+  jmp  put_asciihi
+myhialph:
+  add  al,37h
+put_asciihi:
+  mov  [byteasciihi],al
+  RET
+;;---------------------------------------------------55
+  [SECTION .dseg]
+Laddr: db '0000 0000: '
+Lfld: db 'cc cc cc cc cc cc cc cc '
+      db 'cc cc cc cc cc cc cc cc '
+Lbrd: db '|'
+Lval: db '................'
+Llen:
+indxhi: db 20h ;; High nibble in ascii
+indxlo: db 20h ;; Low nibble in ascii
+indxlolo: db 20h ;; 16ths digit..
+val16ths: db 0   ;;  its value
+byteasciihi: db 20h
+byteasciilo: db 20h
+half_sector_index: db 0 ;;Local index ptr.
+col_out_cnt dw 0  ;; output layout control, 768 cols
+ascii_o_cnt dw 0  ;; output layout control, 256 cols
+disp_rec_index db 0 ;0..35, initially 0
+Track_Chg      db 0 ; 0 is current track, 1 is seek_req
+  ;;*** S,C,H Display ***
+Lstat: db ':FLOPPY: | ' 
+Lcyl:  db 'C=00h ' ;; 0..80
+Lhd:   db 'H=00h ' ;; 0..1, else hard drive.
+Lsect: db 'S=01h ' ;; never zero, 18spt
+lenLstat:
+Ldlo:  db 'LOW  '
+Ldhi:  db 'HIGH ' ;; display part of sector.
+
+;;---------------------------------------------------55
+;;  --EO SHOW DTA MODULE--
+;;---------------------------------------------------55
+</CODE></PRE>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

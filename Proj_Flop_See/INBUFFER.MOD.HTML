@@ -1,0 +1,296 @@
+<PRE><CODE>
+;;PAGEWIDTH 80
+;;TITLE 'INBUFFER MODULE'
+;;---------------------------------------------------55
+;; Module Name: inbuffer.mod By: s_dubrovich@yahoo.com
+;; Last Update: 26 JAN 2008  Init: 28 NOV 2007
+;; Vers: 0.0.9  Goal: Input Buffer for user input.
+;; Desc:
+;; Input Module for User, Returns Line buffer, edited.
+;; EndDesc:
+;;
+;; SubrLst:     //Code Labels meant for Global Use.
+;;  Get_Usr_Input:
+;;  GetHexDigit:    //ret AH.binval, AL.hexdigit
+;;  Get_Keyboard:   //return keypress char
+;;  Parse_Cmd:      //ret AH.input length, AL.1st_char
+;; EndSubrLst:
+;;
+;; ExternLst:   //Code Labels refer to another module.
+;; SetPgCurs:   // in VID_SERV.MOD
+;; putc:
+;; EndExternLst:
+;;
+;; GlobalLst:   //Our Data Labels meant for Global Use.
+;; EndGlobalLst:
+;;
+;; ExternDataLst:  //Data Labels in Another Module.
+;; VidRow:      // in VID_SERV.MOD
+;; VidCol:      // in VID_SERV.MOD
+;; EndExternDataLst:
+;;
+;; ReqdFNL:     //List Function Libs. we Require
+;; EndReqd FNL:
+;;---------------------------------------------------55
+;;---------------------------------------------------55
+;; 26-Jan-08  10:53:15 PM
+;;---------------------------------------------------55
+;; -f bin -l inbuffer.lst -e -s inbuffer.mod
+;;---------------------------------------------------55
+;; S U B R O U T I N E
+;;---------------------------------------------------55
+;-; These are provided to the user of this call in 
+;-;  this version:
+;-; entry: DX: offset Buffer Control Pkt.
+;-;        SI: offset Console Buffer.
+;;
+;; Exit:  SI: offset of Console Buffer.
+;;        BX: length of user input string.
+;;        DX: offset of IOBuffCtrl.
+;;
+;-;TRUE     equ 1
+;-;FALSE    equ TRUE-TRUE  
+TestingINBUFF equ FALSE
+conbuffmax equ 64
+
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+;;---- user call to Service_Fn10 ----
+;;---- example caller subroutine ----
+  [SECTION .cseg]
+
+Get_Usr_Input:
+
+  call rdconbuff     ;; Service_Fn10 call
+
+  mov  bx,[Ctrl_PP.RetLen] ;;Last in +1 for termination
+  mov  si,ConBuff    ;; Ret Ptr to Line Buffer.
+  mov  [si + bx],byte 0Dh ;;install termination
+  mov  dx,IOBuffCtrl ;; Ret Ptr to Buffer Control.
+  RET
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+
+;;---------------------------------------------------55
+;;----Subroutines----
+;;---------------------------------------------------55
+;; Service Fn10, Read User Input to Console Buffer.
+;;  Provides user with an Editable Console Input.
+;;  Terminated by User with [Enter] key. 0Dh.
+;; Output is echoed to Console cursor position which
+;;  is at VidRow & VidCol set by SetPgCurs.
+  [SECTION .cseg]
+Service_Fn10:
+rdconbuff:
+  ;;--conout echo, setup buffer control--
+  mov  [Ctrl_PP.MaxLen],word conbuffmax ;; const len
+  mov  [Ctrl_PP.RetLen],word 0 ;; init to zero
+  mov  [Ctrl_PP.IndexA],word 0 ;; init to ConBuff[0]
+  mov  [Ctrl_PP.IndexB],word 0 ;; init to ConBuff[0]
+
+;;--conout echo, setup cusor position--
+  mov  [VidRow], byte 24 ;; last row
+  mov  [VidCol], byte 0  ;; 1st Column
+  call SetPgCurs
+
+;;---------------------------------------------------55
+keyin:
+  call Get_Keyboard    ;;Rets: AH.ScanCode AL.Char 
+
+;;---AL.Char---
+;;Filter 0Dh == end of input
+  cmp  al,0Dh   ;; [Enter] keypressed, quit
+  jz   keyin_done
+
+;;---Filters null Ascii---
+  cmp  al,0            ;; Ck for ASCII 
+  jz   keyin           ;; ZR .IF. no ASCII .DO. loop
+
+;;---Filter non- printables...---
+;; <20h,>=7Fh, allow cursor positioning controls.
+;; Do Ctrls first
+  ;;--TBI--
+  cmp  al,8   ;;BackSpace
+  jne  nxt01
+
+  cmp  [Ctrl_PP.RetLen], word 0 ;; index low limit
+  je   nxt01
+
+  call Dec_Cursor
+
+nxt01:
+  cmp  al,20h  ;; filter below space
+  jb   keyin
+  cmp  al,7Eh  ;; filter above Tild
+  ja   keyin
+
+;;---Keyin Accepted---
+;; Echo to Console at current cursor position.
+;;  the char in AL, default [VidAttr].
+  call putc  ;; char in AL
+
+;;-----------------------------
+;;--Save Char to ConBuff--
+;; update Ptr's.
+;;
+  mov  si,[Ctrl_PP.IndexA]
+  mov  [ConBuff + si],al  ;; store char in LnBuff
+  cmp  si,[Ctrl_PP.MaxLen]
+  jnb  .nxt
+  inc  si
+  mov  [Ctrl_PP.IndexA],si ;; update to next
+  call Inc_Cursor
+.nxt
+
+;;-----------------------------
+;;Ck == Limit -> keyin_done.
+;; update ptr to next buffer position.
+
+  inc  word [Ctrl_PP.RetLen]  ;; input counter++
+  mov  bx,[Ctrl_PP.MaxLen]
+  cmp  bx,[Ctrl_PP.RetLen]
+  jz   keyin_done
+
+;;%IF TestingINBUFF
+; ; nop
+;  nop ;;space to trap to ck filters.
+;  nop
+;  nop
+;%ENDIF
+
+  jmp  keyin  ;; loop until input is done
+
+keyin_done:
+
+  RET
+;;---------------------------------------------------55
+;; Parse_Cmd. Ret AH.input_len, AL.1st_char
+Parse_Cmd:
+  call Get_Usr_Input   ;; fetch user input
+
+  mov  ah,[byte Ctrl_PP.RetLen]
+  mov  al,[byte ConBuff]
+  RET
+
+;;---------------------------------------------------55
+;; from user get Hexadecimal digit.  
+;;  Return: AH'binary value, AL'ascii hex digit
+;;   ex. zero -> AH'0h, AL'30h
+GetHexDigit:
+  call Get_Keyboard  ;; ret hex val of keypress in AL
+  mov  ah,al
+  cmp  al,41h     ;; lwr limit of uppercase
+  jb   .Lcknum
+  ;; .else. ck a..f or A..F
+  cmp  al,61h     ;; lwr limit of lwrcase
+  jb   .Lckupcase
+  ;;  .else. possibly lower case.
+  cmp  al,66h
+  ja   .Lerrxit   ;; > f
+  ;;  .else. lwrcase within lmt, conv uppercase ascii.
+  sub  al,20h  ;; set to A..F
+  sub  ah,57h  ;; 0Ah..0Fh
+  clc          ;; return w'carry clear for ok.
+  jmp  .Lokxit
+
+.Lckupcase:  ;; .is. 41h<c<61h
+  cmp  al,46h     ;; limit F
+  ja   .Lerrxit
+  ;;  .else. A..F
+  sub  ah,37h
+  clc          ;; return w'carry clear for ok.
+  jmp  .Lokxit
+
+.Lcknum:  ;; < 40h, digit?
+  cmp  al,30h     ;; lwr bound 0
+  jb   .Lerrxit
+  ;; .else. ? > 9
+  cmp  al,39h
+  ja   .Lerrxit
+  sub  ah,30h  ;; AH'0..9
+  clc          ;; return w'carry clear for ok.
+  jmp  .Lokxit
+.Lerrxit:
+  stc
+.Lokxit:
+  RET
+
+;;---------------------------------------------------55
+;; Read Keyboard Input. AH.00h
+;; Rets: AH.ScanCode AL.Char AL.00h means extended
+;;  key code in AH.
+  [SECTION .cseg]
+Get_Keyboard:
+  mov  ah,0h
+  int  16h
+;%IF TestingINBUFF
+;  push ES
+;  mov  dx,40h
+;  mov  ES,dx
+;  mov  dx,[word ES:001Ah] ;; fetch Head
+;  mov  [Old_Head],dx
+;  mov  dx,[word ES:001Ch] ;; fetch Tail
+;  mov  [Newest_Tail],dx
+;  pop  ES
+;%ENDIF
+  RET
+
+;%IF TestingINBUFF
+;[SECTION .dseg]
+;Old_Head dw 0
+;Newest_Tail dw 0
+;%ENDIF
+
+;;---------------------------------------------------55
+;;--Cursor Movement--
+  [SECTION .cseg]
+
+Inc_Cursor:
+  inc  byte [VidCol]  ;; update cursor
+  jmp  Move_Cursor
+
+Dec_Cursor:
+  dec  word [Ctrl_PP.RetLen]
+  dec  byte [VidCol]  ;; update cursor
+
+Move_Cursor:
+  call SetPgCurs
+  RET
+
+;;----------------
+  [SECTION .dseg]
+
+struc  Ctrl_PP  ;; 16-byte Control Paragraph.
+  .Link:   resd 1 ;; collation, 1+
+  .MaxLen: resw 1 ;; 0..0FFFh, 0..4K-1
+  .RetLen: resw 1 ;; on ret, set to len of input.
+  .IndexA: resw 1 ;; buffer ptr A
+  .IndexB: resw 1 ;; buffer ptr B
+  .Filler: resw 2 ;; struc len 16 bytes.
+endstruc
+
+;;struc  IOBuff
+;;  .Buff:   resb 01000h  ;; 4K Pg, static size.
+;;endstruc
+
+
+  [SECTION .dseg]
+IOBuffCtrl:
+ istruc Ctrl_PP
+  at Ctrl_PP.Link,   dd ConBuff    ;; dbl word but..
+  at Ctrl_PP.MaxLen, dw conbuffmax ;; Val Max Allowed
+  at Ctrl_PP.RetLen, dw 0 ;; User Len used.
+  at Ctrl_PP.IndexA, dw 0 ;; at start, initially
+  at Ctrl_PP.IndexB, dw 0
+  at Ctrl_PP.Filler, dw 0,0
+ iend
+
+ConBuff TIMES conbuffmax db 20h ;; actual Line Buffer.
+
+;;---------------------------------------------------55
+;;  --EO INBUFFER.MOD MODULE--
+;;---------------------------------------------------55
+</CODE></PRE>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

@@ -1,0 +1,157 @@
+<PRE><CODE>
+;;PAGEWIDTH 80
+;;TITLE 'POKE STRING MODULE'
+;;---------------------------------------------------55
+;; Module Name: pokestr .mod By: s_dubrovich@yahoo.com
+;; Last Update: 19 JAN 2008  Init: 19 JAN 2008
+;; Vers: 0.0.1b Goal: Write Str, module form. 
+;; Desc:
+;;  Subroutine Module. To replace Int10h AH.13h with
+;;  a direct video memory write form.  This is to 
+;;  avoid Bell, Tab, etc.
+;; EndDesc:
+;;
+;; SubrLst:     //Code Labels meant for Global Use.
+;; PokeString:
+;; PPrntLocCalc:
+;; EndSubrLst:
+;;
+;; ExternLst:   //Code Labels refer to another module.
+;; EndExternLst:
+;;
+;; GlobalLst:   //Our Data Labels meant for Global Use.
+;; EndGlobalLst:
+;;
+;; ExternDataLst: //Data Labels in Another Module.
+;; VidRow    // default Row ..all in VID_SERV.MOD
+;; VidCol    // default Col
+;; Vid_Pg    // default Video Page
+;; VidAttr   // default blk char on grn
+;; VidMPtr   // default msg
+;; VidMLen   // string length
+;; EndExternDataLst:
+;;
+;; ReqdFNL:     //List Function Modules we Require
+;; VID_SERV.MOD // Parent.
+;; EndReqd FNL:
+;;---------------------------------------------------55
+;; 20-Jan-08  09:36:10 AM
+;;---------------------------------------------------55
+  [SECTION .cseg]
+;;---------------------------------------------------55
+;; Write String, INT 10h
+;;
+;; AH.13h
+;; AL.Fn_Mode 0..3 [a]
+;; BH.Display_Pg
+;; BL.Attribute  [for Modes 0..1]
+;; CX.Str_Len
+;; DH.Row
+;; DL.Col
+;; ES:BP.Ptr_to_String
+;;
+;; FN_Modes:
+;;  0 Attr in BL, String of Char, Cursor.no_update
+;;  1 Attr in BL, String of Char, Cursor.update
+;;  2 String of Char AND Attr, Cursor.no_update
+;;  3 String of Char AND Attr, Cursor.update
+;;
+
+PokeString: ;; Conout String. Parameters pre-poked.
+  mov  [PokeStorES],ES ;; ES:DI for VidMem Dest.
+;-;  push DS
+;-;  pop  ES
+  pusha
+  mov  ah,13h
+  mov  al,1
+  mov  bh,[Vid_Pg]
+  mov  bl,[VidAttr]	
+  mov  cx,[VidMLen]
+  mov  dh,[VidRow]
+  mov  dl,[VidCol]
+  push bp
+  mov  bp,[VidMPtr]
+  call PokeVidMem
+  pop  bp
+  popa
+  mov  ES,[StorES]
+  call PPrntLocCalc ;-; let caller do it separately
+  RET
+
+  [SECTION .dseg] ;; See Vid_Serv.Mod
+PokeStorES dw 0
+
+;;---------------------------------------------------55
+;; Substitute Poke Video Memory
+;;
+  [SECTION .cseg]
+PokeVidMem:
+  push ax
+;; calc offset
+  movzx ax,dh  ;; VidRow
+  mul   byte [PokeMaxCol] ;; w/AL
+  mov   dh,0   ;; dl has VidCol
+  add   ax,dx  ;; gives r'c index
+  shl   ax,1   ;; dbl for wordsz, starting mem offset
+  mov   di,ax  ;; dest offset
+;; calc segm
+  movzx ax,bh  ;; vidpg x ((2 x 80 x 25)/16) => x250
+  mul   word [byte PokeMaxCol+1] ;; check if byte value
+  add   ax,[VidMemPg] ;;index into vidpg frame ?dbl'ck?
+  mov   ES,ax  ;; Vid Segm
+;; mov  str
+  cld
+  mov   si,bp  ;; src str offset
+.Lp
+  lodsb        ;; get char to al from DS:SI
+  mov   ah,bl  ;; word char'attr in ax
+  stosw        ;; poked to vidmem at ES:DI
+  dec   cx
+  jcxz  .Next
+  jmp   .Lp
+.Next
+;; update row'col
+  pop  ax
+  RET
+
+  [SECTION .dseg]
+VidMemPg dw 0B800h  ;; color base page.
+PokeMaxCol db 50h,0FAh ;; maxcol, vidpg frame length
+;;---------------------------------------------------55
+;; Print Location Calc. (next loc)
+;; Calc RowCol from current plus VidMLen.
+;; Then update VidParams.
+  [SECTION .cseg]
+PPrntLocCalc:
+  mov  cx,[VidMLen]      ;; Length just printed.
+  movzx ax,[byte VidCol] ;; Previous starting location.
+  add  ax,cx  ;; Col plus Len Msg
+  mov  cl,[VidColMax]    ;; 79,0..79
+  div  cl     ;; AL.quot->Row+, AH.remainder->Col
+  mov  [VidCol],ah
+  add  [VidRow],al  ;;??trap maxrow??
+  RET
+;;---------------------------------------------------55
+;; 
+pputc: ;;char in AL
+  pusha
+   
+  mov  [MyChar],al
+  mov  [VidMPtr],word PMyChar
+  mov  [VidMLen], word 1
+  call PokeString
+  call PPrntLocCalc
+ 
+  popa
+  RET
+  [SECTION .dseg]
+PMyChar db 3Fh,3Fh
+;;---------------------------------------------------55
+;;  --EO POKESTR MODULE--
+;;---------------------------------------------------55
+</CODE></PRE>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

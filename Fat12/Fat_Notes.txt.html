@@ -1,0 +1,143 @@
+<PRE><CODE>
+Fat_Notes.txt By: s_dubrovich@yahoo.com
+
+Last: 31-Dec-08 07:55:26 PM
+Init: 31-Dec-08 01:26:00 PM
+
+For FAT12, 12 bits per fat index means smallest byte string of 3 bytes,
+= 24 bits for two Clusters.  Cluster 0 & 1 are reserved, so that the
+first data cluster is #2, an even number.  Thus the bit mapping is as
+follows:
+
+EVEN   bbbbbbbb xxxxbbbb --------  Cluster # 2
+ODD    -------- bbbbxxxx bbbbbbbb  Cluster # 3
+
+** Such That Low-High Bytes of _Word_ Access := **
+EVEN   76543210 xxxxBA98 --------  Cluster # 2, 
+CLU    |Low 12 bits of Word retrieved. -> xxxxBA98 76543210 b
+
+ODD    -------- 3210xxxx BA987654  Cluster # 3
+CLUster         |High 12 bits of Word retrieved. -> BA987654 3210xxxx b 
+
+so that, EVEN+ODD = 3 byte string.
+such that (3*CLU#)/2 = byte addressable index, offset into Fat Table.
+
+CLU 0 not used -,- Byte Indexes 0,1,2
+CLU 1 not used /
+CLU 2  (3*2)/2 = Byte Index 3    = 3
+CLU 3  (3*3)/2 = Byte Index 4.5  = 4
+CLU 4  (3*4)/2 = Byte Index 6    = 6
+CLU 5  (3*5)/2 = Byte Index 7.5  = 7
+CLU 6  (3*6)/2 = Byte Index 9    = 9
+CLU 5  (3*7)/2 = Byte Index 10.5 = 10
+. . .
+
+--------------
+FAT12: of newly formatted diskette:
+0000 0200: F0 FF FF 00 00 00 00 00 00 00 00 00 00 00 00 00 |=牋
+0000 0210: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 |
+Cluster 0 & 1 are reserved, so the first data cluster, #2 begins at 0003h.
+--------------
+FAT12: of two files, 1st is one cluster: CLU 02. The second file begins at
+       CLU03 and end at CLU 4.
+
+:F0 FF FF FF 4F 00 FF 0F 00 00 00 00 00 00 00 00 |
+CLU 0&1  | 
+CLU 2     FF xF .............. = xFFFh, end of CLU chain.
+CLU 3        4x 00 ........... = 004xh, ODD, next CLU 4
+CLU 4              FF xF ..... = xFFFh, EVEN, end chain.
+CLU 5                 0x 00 .. = 000xh, ODD, non-committed.
+. . . 
+Directory Entry + 1Ah = Starting CLU
+Directory Entry + 1Ch = FileSize in Bytes, Double Word.
+
+0000 0200: 46 49 52 53 54 20 20 20 54 58 54 20 00 40 F6 71 |FIRST   TXT  @鱭
+0000 0210: 9F 39 9F 39 00 00 A9 71 9F 39 02 00 00 02 00 00 |  ?q�9?  ?  
+0000 0220: 53 45 43 4F 4E 44 20 20 54 58 54 20 00 1F FB 71 |SECOND  TXT  ??q
+0000 0230: 9F 39 9F 39 00 00 CC 71 9F 39 03 00 00 04 00 00 |  ?q�9?  ?  
+0000 0240: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 |                
+0000 0250: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 |                
+
+FIRST   TXT  Start CLU == 02 00 or 0002h
+FIRST   TXT  FileSize  == 00 02 00 00 or 00000200h = one CLU in Length
+SECOND  TXT  Start CLU == 03 00 or 0003h
+SECOND  TXT  FileSize  == 00 04 00 00 or 00000400h = two CLU's in Length.
+
+;;------------------
+Considering a 1.44 mb floppy has 2880 sectors, 2880 == 0B40h Limit.
+            a 2.88 mb rareity has a limit of 5760 == 1680h Overflow of 12 bits.
+0B40h == 1011 0100 0000 b
+-Typically-
+DirSz    equ (( 0E0h * 32) / 512) ;; 14d sectors = 7k, DirEntries = 0E0h
+DirOffs  equ (9 * 2) + 1 ;;resv   ;; 19d sectors
+DataSect equ (DirOffs + DirSz)    ;; 33d = 21h
+FATsz    equ (9 * 2)              ;; 18d sectors
+-So-
+The first 20 sectors are outside the 12bit limit, reducing total 0B40h - 20h
+== 0B20h == 2848 sectors covered by Fat, for that Limit,
+== 1011 0010 0000 b
+
+;;------------------
+-= Some values for the FAT entry have special meaning. =-
+000h available for use.
+FF7h Bad Cluster.
+FFFh End of Cluster Chain.
+
+;;------------------
+/* 3.5 Media Descriptors */
+
+#define FLD_144 0xF0
+#define FLD_720 0xF9
+
+/* FAT Cluster, Special
+ Values */
+
+#define  CLU_AVAIL 0x00
+#define  CLU_RESL 0xFF0
+#define  CLU_RESH 0xFF6
+#define  CLU_BAD 0xFF7
+#define  CLU_LASTL 0xFF8
+#define  CLU_LASTH 0xFFF
+
+/* ROOT Directory Entry Descriptors - Offsets */
+
+#define  FILENAME 0x00
+#define  EXT 0x08
+#define  FILE_ATT 0x0B
+#define  RESERVED 0x0C
+#define  CRE_TIME 0x16
+#define  CRE_DATE 0x18
+#define  CLU_START 0x1A
+#define  FILE_SIZE 0x1C
+
+/* First Byte Filename Values */
+
+#define  END 0x00
+#define  CHAR_E5 0x05
+#define  ALIAS 0x2E
+#define  ERASED 0xE5
+
+/* File Attribute Byte Values */
+
+#define  READ   0x00
+#define  HIDDEN 0x01
+#define  SYSTEM 0x02
+#define  VOLUME 0x03
+#define  DIRECTY 0x04
+#define  ARCHIVE 0x05
+
+;;------------------
+;; F I E L D S
+;;------------------
+FCB+
+001Ch := filesize in bytes, dd in size (2 words)
+--==**  File is padded with nulls to sector boundry. **==--
+
+;;------------------
+;; --==** EOF **==--
+;;------------------
+</CODE></PRE>
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->

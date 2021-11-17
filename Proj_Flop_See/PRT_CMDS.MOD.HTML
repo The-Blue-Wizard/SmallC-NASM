@@ -1,0 +1,135 @@
+<PRE><CODE>
+;;PAGEWIDTH 80
+;;TITLE 'PRINT USER COMMANDS MODULE'
+;;---------------------------------------------------55
+;; Module Name: prt_cmds.mod By: s_dubrovich@yahoo.com
+;; Last: 07-Feb-09 02:00:14 PM
+;; Prev: 07-Feb-09 01:07:02 PM
+;; Init: 07-Feb-09 11:49:18 AM
+;; Vers: 0.0.3  Goal: Print user commands on screen.
+;; Desc:
+;;  Module to print user commands legend to screen.
+;; EndDesc:
+;;
+;; SubrLst:     //Code Labels meant for Global Use.
+;;  CmdsLegend:
+;; EndSubrLst:
+;;
+;; ExternLst:   //Code Labels refer to another module.
+;;  WriteString:   // in WRT_STR
+;; EndExternLst:
+;;
+;; GlobalLst:   //Our Data Labels meant for Global Use.
+;; EndGlobalLst:
+;;
+;; ExternDataLst:  //Data Labels in Another Module.
+;;  VidAttr: // in VID_SERV
+;;  VidMLen: // in VID_SERV
+;;  VidCol:  // in VID_SERV
+;;  VidRow:  // in VID_SERV
+;;  Vid_Pg:  // in VID_SERV
+;; EndExternDataLst:
+;;
+;; ReqdFNL:     //List Function Modules we Require
+;;  WR_STR.MOD
+;;  VID_SERV.MOD // Parent.
+;; EndReqd FNL:
+;;---------------------------------------------------55
+;; 24-Nov-07 09:57:07 PM
+;;---------------------------------------------------55
+;; STATUS .. fix prnt loc to 0,0 ok?
+;;---------------------------------------------------55
+  [SECTION .cseg]
+CmdMsgAttr EQU 5Fh
+
+CmdsLegend:
+  push ax
+  mov  al,[VidAttr]
+  mov  [StorAttr],al
+  pop  ax
+
+Do_msg1:
+  mov  [Vid_Pg],byte 0
+  mov  [VidCol],byte 0
+  mov  [VidRow],byte 18
+  mov  [VidAttr],byte CmdMsgAttr
+  mov  [VidMLen],word len_sm1
+  mov  [VidMPtr],word cmsg1
+
+  call WriteString   ;; RomBios WrtStr
+
+Do_msg2:
+  mov  [Vid_Pg],byte 0
+  mov  [VidCol],byte 0
+  mov  [VidRow],byte 19
+  mov  [VidAttr],byte CmdMsgAttr
+  mov  [VidMLen],word len_sm2
+  mov  [VidMPtr],word cmsg2
+
+  call WriteString
+
+Do_msg3:
+  mov  [Vid_Pg],byte 0
+  mov  [VidCol],byte 0
+  mov  [VidRow],byte 20
+  mov  [VidAttr],byte CmdMsgAttr
+  mov  [VidMLen],word len_sm3
+  mov  [VidMPtr],word cmsg3
+
+  call WriteString
+
+Do_msg4:
+  mov  [Vid_Pg],byte 0
+  mov  [VidCol],byte 0
+  mov  [VidRow],byte 21
+  mov  [VidAttr],byte CmdMsgAttr
+  mov  [VidMLen],word len_sm4
+  mov  [VidMPtr],word cmsg4
+
+  call WriteString
+
+Do_msg5:
+  mov  [Vid_Pg],byte 0
+  mov  [VidCol],byte 0
+  mov  [VidRow],byte 22
+  mov  [VidAttr],byte CmdMsgAttr
+  mov  [VidMLen],word len_sm5
+  mov  [VidMPtr],word cmsg5
+
+  call WriteString
+
+  push ax
+  mov  al,[StorAttr]
+  mov  [VidAttr],al  ;; restore attr
+  pop  ax
+
+  RET
+
+  [SECTION .dseg] ;; see Vid_Serv.Mod
+StorAttr    db 1Fh  ;; Default
+;;FAttr     db 6Fh  ;; Fill Attr: wht on brn
+;;BkgrdChar db 0B0h ;; blobs B0..B2, Solid 0DBh
+;;= = = = = = = = = = = = = = = = = = = = = = = = = =55
+cmsg1: db 'Commands:  Q,q := Quit.  '
+       db '- := decrement sector, + := increment sector.'
+len_sm1 equ $-cmsg1
+cmsg2: db 'R,r := reloggin disk to CHS=0,0,1  '
+       db 'L,l := New Diskette Login to current CHS.'
+len_sm2 equ $-cmsg2
+cmsg3: db 'T,t := increment to next track.  '
+       db 'C,c := user select cylinder.'
+len_sm3 equ $-cmsg3
+cmsg4: db 'H,h := toggle between head 0,1.'
+len_sm4 equ $-cmsg4
+cmsg5: db 'S,s := Seek to sector index in current '
+       db 'track buff.'
+len_sm5 equ $-cmsg5
+;;---------------------------------------------------55
+;;  --EO PRT_CMDS SUBROUTINE MODULE--
+;;---------------------------------------------------55
+</CODE></PRE>
+
+<!-- www.000webhost.com Analytics Code -->
+<script type="text/javascript" src="http://analytics.hosting24.com/count.php"></script>
+<noscript><a href="http://www.hosting24.com/"><img src="http://analytics.hosting24.com/count.php" alt="web hosting" /></a></noscript>
+<!-- End Of Analytics Code -->
